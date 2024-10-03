@@ -12,6 +12,7 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.io.IOException;
@@ -26,17 +27,17 @@ import java.util.regex.Pattern;
 @SpringBootApplication
 public class ScheduleParsingApplication {
 
-	private static ScheduleParsingService scheduleParsingService = new ScheduleParsingService();
+	//private static ScheduleParsingService scheduleParsingService = new ScheduleParsingService();
 
 	public static void main(String[] args) throws IOException {
 
-		long startTime = System.currentTimeMillis();
-		String group = "К0709-23/3";
-		Integer week = 0;
-		scheduleParsingService.getSchedule(group, week);
-		System.out.println(System.currentTimeMillis() - startTime);
+//		long startTime = System.currentTimeMillis();
+//		String group = "К0709-23/3";
+//		Integer week = 0;
+//		scheduleParsingService.getSchedule(group, week);
+//		System.out.println(System.currentTimeMillis() - startTime);
 
-		//SpringApplication.run(ScheduleParsingApplication.class, args);
+		SpringApplication.run(ScheduleParsingApplication.class, args);
 	}
 
 }

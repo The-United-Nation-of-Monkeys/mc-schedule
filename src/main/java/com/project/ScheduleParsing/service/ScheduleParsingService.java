@@ -2,8 +2,8 @@ package com.project.ScheduleParsing.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.project.ScheduleParsing.dto.Day;
+import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.request.Fingerprint;
 import com.project.ScheduleParsing.request.Request;
@@ -12,7 +12,6 @@ import com.project.ScheduleParsing.request.updates.Payload;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringEscapeUtils;
-import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -47,11 +46,11 @@ public class ScheduleParsingService {
 
     private final Gson gson = new GsonBuilder().serializeNulls().create();
 
-    public void getSchedule(String group, Integer week) throws IOException {
+    public Schedule getSchedule(String group, Integer week) throws IOException {
         Request request1 = firstConnectionToSchedule();
         Request request2 = secondConnectionToSchedule(request1);
         Request request3 = thirdConnectionToSchedule(request2, group, week);
-        lastConnectionToSchedule(request3);
+        return lastConnectionToSchedule(request3);
     }
 
     public Request firstConnectionToSchedule() throws IOException {
@@ -72,7 +71,6 @@ public class ScheduleParsingService {
         siriusSession = "raspisanie_universitet_sirius_session="+response1.cookie("raspisanie_universitet_sirius_session");
 
         Element element1 = doc.selectFirst("div[wire:id]");
-
         htmlHash = extractValueFromHtml(doc.html(), "htmlHash");
         checkSum = extractValueFromHtml(doc.html(), "checksum");
         if (element1 != null) {
@@ -83,75 +81,38 @@ public class ScheduleParsingService {
     }
 
     public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
-        Connection.Response response2 = getConnection(firstRequest);
-        String decodedString = StringEscapeUtils.unescapeJava(response2.body());
+        Connection.Response response = getConnection(firstRequest);
+        String decodedString = StringEscapeUtils.unescapeJava(response.body());
         htmlHash = extractValueFromJson(decodedString, "htmlHash");
         checkSum = extractValueFromJson(decodedString, "checksum");
         return buildSecondRequest();
     }
 
     public Request thirdConnectionToSchedule(Request secondRequest, String group, Integer week) throws IOException {
-        Connection.Response response3 = getConnection(secondRequest);
-        String responseBody3 = response3.body();
-        checkSum = extractValueFromJson(responseBody3, "checksum");
+        Connection.Response response = getConnection(secondRequest);
+        String responseBody = response.body();
+        checkSum = extractValueFromJson(responseBody, "checksum");
         return buildThirdRequest(group, week);
     }
 
-    public void lastConnectionToSchedule(Request thirdRequest) throws IOException {
-        Connection.Response response4 = getConnection(thirdRequest);
+    public Schedule lastConnectionToSchedule(Request thirdRequest) throws IOException {
+        Connection.Response lastResponse = getConnection(thirdRequest);
 
-        String responseBody4 = response4.body();
-        String decodedString4 = StringEscapeUtils.unescapeJava(responseBody4);
+        String responseBody = lastResponse.body();
+        String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
 
         String startMarker = "{\"effects\":{\"html\":\"<div wire:id=\"";
         String endMarker = "<div wire:id";
         String endMarker2 = "</div>";
 
-        int startIndex = decodedString4.indexOf(startMarker);
-        int endIndex = decodedString4.indexOf(endMarker, startIndex);
-        int endIndex2 = decodedString4.lastIndexOf(endMarker2);
+        int startIndex = htmlSchedule.indexOf(startMarker);
+        int endIndex = htmlSchedule.indexOf(endMarker, startIndex);
+        int endIndex2 = htmlSchedule.lastIndexOf(endMarker2);
 
-        decodedString4 = decodedString4.substring(0, startIndex) + decodedString4.substring(endIndex);
-        decodedString4 = decodedString4.substring(0, endIndex2-14);
-        System.out.println(decodedString4);
+        htmlSchedule = htmlSchedule.substring(0, startIndex) + htmlSchedule.substring(endIndex);
+        htmlSchedule = htmlSchedule.substring(0, endIndex2-14);
 
-        Document document = Jsoup.parse(decodedString4);
-
-        Elements date = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-        Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-
-        for (int j = 1; j < headers.size(); j++) {
-            //day of week
-            System.out.println(date.get(j-1).text());
-
-            Element firstHeader = headers.get(j-1);
-            Element secondHeader = headers.get(j);
-
-            Element currentElement = firstHeader.nextElementSibling();
-
-            StringBuilder result = new StringBuilder();
-
-            while (currentElement != null && !currentElement.equals(secondHeader)) {
-                result.append(currentElement.outerHtml());
-                currentElement = currentElement.nextElementSibling();
-            }
-
-            Document docPair = Jsoup.parse(result.toString());
-            int size = docPair.select(".text-gray-400.text-sm.pl-1").size();
-
-            for(int i = 0; i < size; i++) {
-                String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
-                String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
-                String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
-                String pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span").get(i).text();
-                String pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold").get(i).text();
-                String pairTime = docPair.select(".ml-auto.text-sm").get(i).text();
-
-                System.out.println(pairNumber + " | " + pairType + " | " + pairName + " | " + pairTeachers + " | " + pairLocation + " | " + pairTime);
-
-            }
-        }
-
+        return parseSchedule(htmlSchedule);
     }
 
     private Connection.Response getConnection(Request request) throws IOException {
@@ -328,9 +289,61 @@ public class ScheduleParsingService {
                 .build();
     }
 
-    private Schedule parseSchedule(String schedule) {
+    private Schedule parseSchedule(String htmlSchedule) {
+        List<Day> days = new ArrayList<>();
+        Document document = Jsoup.parse(htmlSchedule);
+        Elements date = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
+        Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
+        Element lastPair = document.select("div.display-contents").first();
 
+        for (int j = 1; j < headers.size() + 1; j++) {
+            Element firstHeader = headers.get(j-1);
+            Element secondHeader;
 
-        return null;
+            if (j == headers.size()) {
+                secondHeader = lastPair;
+            } else {
+                secondHeader = headers.get(j);
+            }
+
+            Element currentElement = firstHeader.nextElementSibling();
+            StringBuilder result = new StringBuilder();
+            while (currentElement != null && !currentElement.equals(secondHeader)) {
+                result.append(currentElement.outerHtml());
+                currentElement = currentElement.nextElementSibling();
+            }
+
+            Document docPair = Jsoup.parse(result.toString());
+            int size = docPair.select(".text-gray-400.text-sm.pl-1").size();
+            List<Pair> pairs = new ArrayList<>();
+
+            for(int i = 0; i < size; i++) {
+                String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
+                String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
+                String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
+                String pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span").get(i).text();
+                String pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold").get(i).text();
+                String pairTime = docPair.select(".ml-auto.text-sm").get(i).text();
+
+                pairs.add(Pair.builder()
+                        .pairNumber(pairNumber)
+                        .pairType(pairType)
+                        .pairName(pairName)
+                        .pairTeacher(pairTeachers)
+                        .pairLocation(pairLocation)
+                        .pairTime(pairTime)
+                        .build());
+            }
+
+            days.add(Day.builder()
+                    .dayOfWeek(date.get(j-1).text())
+                    .pairCount(pairs.size())
+                    .pairs(pairs)
+                    .build());
+        }
+
+        return Schedule.builder()
+                .days(days)
+                .build();
     }
 }

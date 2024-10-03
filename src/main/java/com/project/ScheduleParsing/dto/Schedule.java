@@ -7,6 +7,7 @@ import java.util.List;
 
 @Data
 @Builder
+
 public class Schedule {
 
     private List<Day> days;
