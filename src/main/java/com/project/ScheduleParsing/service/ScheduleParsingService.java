@@ -11,6 +11,7 @@ import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -20,16 +21,16 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ScheduleParsingService {
 
     private String liveWireToken;
@@ -296,6 +297,7 @@ public class ScheduleParsingService {
         Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
         Element lastPair = document.select("div.display-contents").first();
 
+        log.info(htmlSchedule);
         for (int j = 1; j < headers.size() + 1; j++) {
             Element firstHeader = headers.get(j-1);
             Element secondHeader;
@@ -318,25 +320,36 @@ public class ScheduleParsingService {
             List<Pair> pairs = new ArrayList<>();
 
             for(int i = 0; i < size; i++) {
+                log.info(String.valueOf(i));
                 String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
                 String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
                 String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
-                String pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span").get(i).text();
-                String pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold").get(i).text();
                 String pairTime = docPair.select(".ml-auto.text-sm").get(i).text();
+                Elements pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span.line-clamp-2");
+                Elements pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold");
+
+                Optional<String> optTeacher = (i < pairTeachers.size()) ? Optional.of(pairTeachers.get(i).text()) : Optional.empty();
+                Optional<String> optLocation = (i < pairLocation.size()) ? Optional.of(pairLocation.get(i).text()) : Optional.empty();
+
+                log.info("{}, {}", pairName, pairTeachers.text());
 
                 pairs.add(Pair.builder()
-                        .pairNumber(pairNumber)
+                        .pairNumber(Integer.valueOf(pairNumber))
                         .pairType(pairType)
                         .pairName(pairName)
-                        .pairTeacher(pairTeachers)
-                        .pairLocation(pairLocation)
+                        .pairTeacher(optTeacher.orElse(""))
+                        .pairLocation(optLocation.orElse(""))
                         .pairTime(pairTime)
                         .build());
             }
 
+            String[] fullDate = date.get(j - 1).text().split(", ")[1].split(" ");
+            LocalDate localDate = LocalDate.of(2024, MonthForFront.valueOf(fullDate[1]).ordinal(), Integer.parseInt(fullDate[0]));
+
             days.add(Day.builder()
-                    .dayOfWeek(date.get(j-1).text())
+                    .day(localDate.getDayOfMonth())
+                    .month(localDate.getMonthValue())
+//                            .year(localDate.getYear())
                     .pairCount(pairs.size())
                     .pairs(pairs)
                     .build());
