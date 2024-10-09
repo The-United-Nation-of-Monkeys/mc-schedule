@@ -10,7 +10,7 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Data {
+public class DataForGroup {
 
     private String year;
     private String date;
@@ -34,6 +34,6 @@ public class Data {
     private boolean laboratories;
     private boolean exams;
     private boolean other;
-    private Integer width; // Changed to Integer to allow null
+    private Integer width;
     private Integer height;
 }

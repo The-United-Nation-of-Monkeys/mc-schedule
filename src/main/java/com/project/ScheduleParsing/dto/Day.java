@@ -17,9 +17,6 @@ public class Day {
     @Schema(description = "месяц", example = "10")
     private Integer month;
 
-//    @Schema(description = "Год", example = "2024")
-//    private Integer year;
-
     @Schema(description = "количество пар", example = "5")
     private Integer pairCount;
 

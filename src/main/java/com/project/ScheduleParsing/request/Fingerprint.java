@@ -8,9 +8,14 @@ import lombok.Data;
 public class Fingerprint {
 
     private String id;
+
     private String name;
+
     private String locale;
+
     private String path;
+
     private String method;
+
     private String v;
 }

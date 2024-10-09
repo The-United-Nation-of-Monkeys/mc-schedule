@@ -5,6 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.dto.Day;
 import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
+import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Fingerprint;
 import com.project.ScheduleParsing.request.Request;
 import com.project.ScheduleParsing.request.servermemo.*;
@@ -13,6 +14,7 @@ import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringEscapeUtils;
+import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -31,7 +33,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ScheduleParsingService {
+public class GroupScheduleService {
 
     private String liveWireToken;
 
@@ -45,16 +47,25 @@ public class ScheduleParsingService {
 
     private String checkSum;
 
+    private Integer numWeek;
+
     private final Gson gson = new GsonBuilder().serializeNulls().create();
 
-    public Schedule getSchedule(String group, Integer week) throws IOException {
-        Request request1 = firstConnectionToSchedule();
-        Request request2 = secondConnectionToSchedule(request1);
-        Request request3 = thirdConnectionToSchedule(request2, group, week);
-        return lastConnectionToSchedule(request3);
+    public Schedule getScheduleByGroup(String group, Integer week) {
+        log.info("GroupScheduleService: getScheduleByGroup(): group - {}, week - {}", group, week);
+        try {
+            Request request1 = firstConnectionToSchedule();
+            Request request2 = secondConnectionToSchedule(request1);
+            Request request3 = thirdConnectionToSchedule(request2, group, week);
+            return lastConnectionToSchedule(request3);
+        } catch (Exception ex) {
+            log.error(ex.getMessage());
+            throw new ScheduleNotFoundException(ex.getMessage());
+        }
     }
 
     public Request firstConnectionToSchedule() throws IOException {
+        log.info("GroupScheduleService: firstConnectionToSchedule()");
         String scheduleUrl = "https://schedule.siriusuniversity.ru/";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
                 .method(Connection.Method.GET)
@@ -68,12 +79,20 @@ public class ScheduleParsingService {
             liveWireToken = scriptContent.replaceAll(".*window\\.livewire_token = '(.*?)';.*", "$1");
         }
 
+        String jsonData = doc.html().split("wire:initial-data=\"")[1].split("\"")[0]
+                .replace("&quot;", "\"");
+
+        JSONObject jsonObject = new JSONObject(jsonData);
+        JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
+        numWeek = data.getInt("numWeek");
+
         xsrfToken = headers.get("Set-Cookie").trim().split(";")[0];
         siriusSession = "raspisanie_universitet_sirius_session="+response1.cookie("raspisanie_universitet_sirius_session");
 
         Element element1 = doc.selectFirst("div[wire:id]");
         htmlHash = extractValueFromHtml(doc.html(), "htmlHash");
         checkSum = extractValueFromHtml(doc.html(), "checksum");
+        log.info(extractValueFromHtml(doc.html(), "numWeek"));
         if (element1 != null) {
             wireId = element1.attr("wire:id");
         }
@@ -82,6 +101,8 @@ public class ScheduleParsingService {
     }
 
     public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
+        log.info("GroupScheduleService: secondConnectionToSchedule()");
+
         Connection.Response response = getConnection(firstRequest);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
         htmlHash = extractValueFromJson(decodedString, "htmlHash");
@@ -90,6 +111,8 @@ public class ScheduleParsingService {
     }
 
     public Request thirdConnectionToSchedule(Request secondRequest, String group, Integer week) throws IOException {
+        log.info("GroupScheduleService: thirdConnectionToSchedule()");
+
         Connection.Response response = getConnection(secondRequest);
         String responseBody = response.body();
         checkSum = extractValueFromJson(responseBody, "checksum");
@@ -97,6 +120,8 @@ public class ScheduleParsingService {
     }
 
     public Schedule lastConnectionToSchedule(Request thirdRequest) throws IOException {
+        log.info("GroupScheduleService: lastConnectionToSchedule()");
+
         Connection.Response lastResponse = getConnection(thirdRequest);
 
         String responseBody = lastResponse.body();
@@ -237,11 +262,11 @@ public class ScheduleParsingService {
                 .fullForDisplay(MonthForFront.values()[now.getMonthValue()-1].toString())
                 .build();
 
-        Data data = Data.builder()
+        DataForGroup dataForGroup = DataForGroup.builder()
                 .year(String.valueOf(now.getYear()))
                 .date(now.format(formatter))
                 .month(month)
-                .numWeek(6)
+                .numWeek(numWeek)
                 .addNumWeek(0)
                 .minusNumWeek(0)
                 .count(0)
@@ -278,14 +303,14 @@ public class ScheduleParsingService {
 
         ModelCollections modelCollections = new ModelCollections(groupList);
 
-        DataMeta dataMeta = new DataMeta(modelCollections);
+        DataMetaForGroup dataMetaForGroup = new DataMetaForGroup(modelCollections);
 
         return ServerMemo.builder()
                 .children(new ArrayList<>())
                 .errors(new ArrayList<>())
                 .htmlHash(htmlHash)
-                .data(data)
-                .dataMeta(dataMeta)
+                .data(dataForGroup)
+                .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
                 .build();
     }
@@ -297,7 +322,6 @@ public class ScheduleParsingService {
         Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
         Element lastPair = document.select("div.display-contents").first();
 
-        log.info(htmlSchedule);
         for (int j = 1; j < headers.size() + 1; j++) {
             Element firstHeader = headers.get(j-1);
             Element secondHeader;
@@ -320,7 +344,6 @@ public class ScheduleParsingService {
             List<Pair> pairs = new ArrayList<>();
 
             for(int i = 0; i < size; i++) {
-                log.info(String.valueOf(i));
                 String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
                 String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
                 String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
@@ -330,8 +353,6 @@ public class ScheduleParsingService {
 
                 Optional<String> optTeacher = (i < pairTeachers.size()) ? Optional.of(pairTeachers.get(i).text()) : Optional.empty();
                 Optional<String> optLocation = (i < pairLocation.size()) ? Optional.of(pairLocation.get(i).text()) : Optional.empty();
-
-                log.info("{}, {}", pairName, pairTeachers.text());
 
                 pairs.add(Pair.builder()
                         .pairNumber(Integer.valueOf(pairNumber))
@@ -344,12 +365,11 @@ public class ScheduleParsingService {
             }
 
             String[] fullDate = date.get(j - 1).text().split(", ")[1].split(" ");
-            LocalDate localDate = LocalDate.of(2024, MonthForFront.valueOf(fullDate[1]).ordinal(), Integer.parseInt(fullDate[0]));
+            LocalDate localDate = LocalDate.of(2024, MonthForFront.valueOf(fullDate[1]).ordinal() + 1, Integer.parseInt(fullDate[0]));
 
             days.add(Day.builder()
                     .day(localDate.getDayOfMonth())
                     .month(localDate.getMonthValue())
-//                            .year(localDate.getYear())
                     .pairCount(pairs.size())
                     .pairs(pairs)
                     .build());

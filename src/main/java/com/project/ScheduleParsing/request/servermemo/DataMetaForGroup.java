@@ -5,7 +5,7 @@ import lombok.Data;
 
 @Data
 @AllArgsConstructor
-public class DataMeta {
+public class DataMetaForGroup {
 
     private ModelCollections modelCollections;
 }
