@@ -103,6 +103,7 @@ public class GroupScheduleService {
     public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
         log.info("GroupScheduleService: secondConnectionToSchedule()");
 
+        log.info(gson.toJson(firstRequest));
         Connection.Response response = getConnection(firstRequest);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
         htmlHash = extractValueFromJson(decodedString, "htmlHash");
@@ -143,7 +144,7 @@ public class GroupScheduleService {
 
     private Connection.Response getConnection(Request request) throws IOException {
         return Jsoup.connect("https://schedule.siriusuniversity.ru/livewire/message/main-grid")
-                .header("Content-Length", String.valueOf(1184))
+                .header("Content-Length", String.valueOf(1863))
                 .header("Content-Type", "application/json")
                 .header("Cookie", xsrfToken + "; " + siriusSession)
                 .header("X-Csrf-Token", liveWireToken)
