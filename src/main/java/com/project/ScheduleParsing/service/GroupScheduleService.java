@@ -52,7 +52,7 @@ public class GroupScheduleService {
     private final Gson gson = new GsonBuilder().serializeNulls().create();
 
     public Schedule getScheduleByGroup(String group, Integer week) {
-        log.info("GroupScheduleService: getScheduleByGroup(): group - {}, week - {}", group, week);
+        log.info("GroupScheduleService: start getScheduleByGroup(): group - {}, week - {}", group, week);
         try {
             Request request1 = firstConnectionToSchedule();
             Request request2 = secondConnectionToSchedule(request1);
@@ -65,7 +65,7 @@ public class GroupScheduleService {
     }
 
     public Request firstConnectionToSchedule() throws IOException {
-        log.info("GroupScheduleService: firstConnectionToSchedule()");
+        log.info("GroupScheduleService: start firstConnectionToSchedule()");
         String scheduleUrl = "https://schedule.siriusuniversity.ru/";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
                 .method(Connection.Method.GET)
@@ -92,7 +92,6 @@ public class GroupScheduleService {
         Element element1 = doc.selectFirst("div[wire:id]");
         htmlHash = extractValueFromHtml(doc.html(), "htmlHash");
         checkSum = extractValueFromHtml(doc.html(), "checksum");
-        log.info(extractValueFromHtml(doc.html(), "numWeek"));
         if (element1 != null) {
             wireId = element1.attr("wire:id");
         }
@@ -101,9 +100,8 @@ public class GroupScheduleService {
     }
 
     public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
-        log.info("GroupScheduleService: secondConnectionToSchedule()");
+        log.info("GroupScheduleService: start secondConnectionToSchedule()");
 
-        log.info(gson.toJson(firstRequest));
         Connection.Response response = getConnection(firstRequest);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
         htmlHash = extractValueFromJson(decodedString, "htmlHash");
@@ -112,7 +110,7 @@ public class GroupScheduleService {
     }
 
     public Request thirdConnectionToSchedule(Request secondRequest, String group, Integer week) throws IOException {
-        log.info("GroupScheduleService: thirdConnectionToSchedule()");
+        log.info("GroupScheduleService: start thirdConnectionToSchedule(): {}, {}", group, week);
 
         Connection.Response response = getConnection(secondRequest);
         String responseBody = response.body();
@@ -121,7 +119,7 @@ public class GroupScheduleService {
     }
 
     public Schedule lastConnectionToSchedule(Request thirdRequest) throws IOException {
-        log.info("GroupScheduleService: lastConnectionToSchedule()");
+        log.info("GroupScheduleService: start lastConnectionToSchedule()");
 
         Connection.Response lastResponse = getConnection(thirdRequest);
 

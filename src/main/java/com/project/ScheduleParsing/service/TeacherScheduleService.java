@@ -52,15 +52,22 @@ public class TeacherScheduleService {
     private final Gson gson = new GsonBuilder().serializeNulls().create();
 
     public Schedule getScheduleByTeacher(String teacher, int week) {
+        log.info("TeacherScheduleService: start getScheduleByTeacher(): {}, {}", teacher, week);
         try {
+            Request request1 = firstConnectionToSchedule();
+            secondConnectionToSchedule(request1);
+
             return thirdConnectionToSchedule(teacher, week);
         } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException(ex.getMessage());
         }
+
     }
 
     public Request firstConnectionToSchedule() throws IOException {
+        log.info("TeacherScheduleService: start firstConnectionToSchedule()");
+
         String scheduleUrl = "https://schedule.siriusuniversity.ru/teacher";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
                 .method(Connection.Method.GET)
@@ -74,10 +81,8 @@ public class TeacherScheduleService {
             liveWireToken = scriptContent.replaceAll(".*window\\.livewire_token = '(.*?)';.*", "$1");
         }
 
-
         String jsonData = doc.html().split("wire:initial-data=\"")[1].split("\"")[0]
                 .replace("&quot;", "\"");
-
 
         JSONObject jsonObject = new JSONObject(jsonData);
         JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
@@ -111,20 +116,16 @@ public class TeacherScheduleService {
         return buildFirstRequest(teachersList);
     }
 
-    public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
-        log.info("GroupScheduleService: secondConnectionToSchedule()");
+    public void secondConnectionToSchedule(Request firstRequest) throws IOException {
+        log.info("TeacherScheduleService: start secondConnectionToSchedule()");
 
         String test = "{\"fingerprint\":{\"id\":\"7uQ6Fq0xsgBwqqNy6plx\",\"name\":\"teachers.teacher-main-grid\",\"locale\":\"ru\",\"path\":\"teacher\",\"method\":\"GET\",\"v\":\"acj\"},\"serverMemo\":{\"children\":[],\"errors\":[],\"htmlHash\":\"2d6f408e\",\"data\":{\"year\":\"2024\",\"date\":\"09.10.2024\",\"month\":{\"number\":\"10\",\"full\":\"Октябрь\",\"fullForDisplay\":\"Октября\"},\"numWeek\":7,\"addNumWeek\":0,\"minusNumWeek\":0,\"count\":0,\"type\":\"grid\",\"gridRoute\":\"schedule.teachers.grid\",\"listRoute\":\"schedule.teachers.main\",\"search\":null,\"teacherName\":\"\",\"teacher\":\"\",\"teacherShow\":true,\"teachersList\":{\"Бородин П.М.\":\"Бородин П.М.\",\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\":{\"id\":\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\",\"last_name\":\"Карабельский\",\"first_name_one\":\"А\",\"first_name\":\"Александр\",\"middle_name\":\"Владимирович\",\"middle_name_one\":\"В\",\"fio\":\"Карабельский Александр Владимирович\",\"department_fio\":\"Карабельский Александр Владимирович (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"cefddf57-4108-4bfa-8f78-e43dd8639b1c\":{\"id\":\"cefddf57-4108-4bfa-8f78-e43dd8639b1c\",\"last_name\":\"Чечушков\",\"first_name_one\":\"А\",\"first_name\":\"Антон\",\"middle_name\":\"Владимирович\",\"middle_name_one\":\"В\",\"fio\":\"Чечушков Антон Владимирович\",\"department_fio\":\"Чечушков Антон Владимирович (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"9543d3e9-6e54-42b8-879c-98d73a6ba63e\":{\"id\":\"9543d3e9-6e54-42b8-879c-98d73a6ba63e\",\"last_name\":\"Минская\",\"first_name_one\":\"Е\",\"first_name\":\"Екатерина\",\"middle_name\":\"Сергеевна\",\"middle_name_one\":\"С\",\"fio\":\"Минская Екатерина Сергеевна\",\"department_fio\":\"Минская Екатерина Сергеевна (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"173da7a5-635b-42d0-807f-58292941979f\":{\"id\":\"173da7a5-635b-42d0-807f-58292941979f\",\"last_name\":\"Манахов\",\"first_name_one\":\"А\",\"first_name\":\"Андрей\",\"middle_name\":\"Дмитриевич\",\"middle_name_one\":\"Д\",\"fio\":\"Манахов Андрей Дмитриевич\",\"department_fio\":\"Манахов Андрей Дмитриевич (Направление \\\"Генетика\\\")\",\"department\":\"Направление \\\"Генетика\\\"\"},\"9a75161c-68b2-4431-826e-f1b7d92b631f\":{\"id\":\"9a75161c-68b2-4431-826e-f1b7d92b631f\",\"last_name\":\"Месонжник\",\"first_name_one\":\"Н\",\"first_name\":\"Наталья\",\"middle_name\":\"Владимировна\",\"middle_name_one\":\"В\",\"fio\":\"Месонжник Наталья Владимировна\",\"department_fio\":\"Месонжник Наталья Владимировна (Ресурсный центр аналитических методов)\",\"department\":\"Ресурсный центр аналитических методов\"},\"7fa3d2ba-f02f-4aef-98ea-ae385c7a8453\":{\"id\":\"7fa3d2ba-f02f-4aef-98ea-ae385c7a8453\",\"last_name\":\"Якшин\",\"first_name_one\":\"Д\",\"first_name\":\"Дмитрий\",\"middle_name\":\"Михайлович\",\"middle_name_one\":\"М\",\"fio\":\"Якшин Дмитрий Михайлович\",\"department_fio\":\"Якшин Дмитрий Михайлович (Ресурсный центр генетической инженерии)\",\"department\":\"Ресурсный центр генетической инженерии\"},\"6a6578d5-b080-4bce-8366-b0d01e893a61\":{\"id\":\"6a6578d5-b080-4bce-8366-b0d01e893a61\",\"last_name\":\"Колесова\",\"first_name_one\":\"Е\",\"first_name\":\"Екатерина\",\"middle_name\":\"Петровна\",\"middle_name_one\":\"П\",\"fio\":\"Колесова Екатерина Петровна\",\"department_fio\":\"Колесова Екатерина Петровна (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"a37afafc-4d8f-4fa9-9918-72105e73cac7\":{\"id\":\"a37afafc-4d8f-4fa9-9918-72105e73cac7\",\"last_name\":\"Галиева\",\"first_name_one\":\"А\",\"first_name\":\"Алима\",\"middle_name\":\"Абдураимовна\",\"middle_name_one\":\"А\",\"fio\":\"Галиева Алима Абдураимовна\",\"department_fio\":\"Галиева Алима Абдураимовна (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"2a954b7c-a43e-4c45-8a74-1b4ee0aeff0f\":{\"id\":\"2a954b7c-a43e-4c45-8a74-1b4ee0aeff0f\",\"last_name\":\"Сырочева\",\"first_name_one\":\"А\",\"first_name\":\"Анастасия\",\"middle_name\":\"Олеговна\",\"middle_name_one\":\"О\",\"fio\":\"Сырочева Анастасия Олеговна\",\"department_fio\":\"Сырочева Анастасия Олеговна (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"7693befb-2964-4d99-8b6a-1976c65b1a02\":{\"id\":\"7693befb-2964-4d99-8b6a-1976c65b1a02\",\"last_name\":\"Афонин\",\"first_name_one\":\"М\",\"first_name\":\"Михаил\",\"middle_name\":\"Борисович\",\"middle_name_one\":\"Б\",\"fio\":\"Афонин Михаил Борисович\",\"department_fio\":\"Афонин Михаил Борисович (Ресурсный центр аналитических методов)\",\"department\":\"Ресурсный центр аналитических методов\"},\"0b25137a-0df6-43b8-a0c0-600464466f82\":{\"id\":\"0b25137a-0df6-43b8-a0c0-600464466f82\",\"last_name\":\"Чувашов\",\"first_name_one\":\"А\",\"first_name\":\"Антон\",\"middle_name\":\"Андреевич\",\"middle_name_one\":\"А\",\"fio\":\"Чувашов Антон Андреевич\",\"department_fio\":\"Чувашов Антон Андреевич (Лабораторный комплекс)\",\"department\":\"Лабораторный комплекс\"},\"63b50441-3317-4bd8-bfb5-1e04ca0b57e7\":{\"id\":\"63b50441-3317-4bd8-bfb5-1e04ca0b57e7\",\"last_name\":\"Кульдюшев\",\"first_name_one\":\"Н\",\"first_name\":\"Никита\",\"middle_name\":\"Александрович\",\"middle_name_one\":\"А\",\"fio\":\"Кульдюшев Никита Александрович\",\"department_fio\":\"Кульдюшев Никита Александрович (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"e5b0264b-cf62-4dba-bae0-793febf78529\":{\"id\":\"e5b0264b-cf62-4dba-bae0-793febf78529\",\"last_name\":\"Бровин\",\"first_name_one\":\"А\",\"first_name\":\"Андрей\",\"middle_name\":\"Николаевич\",\"middle_name_one\":\"Н\",\"fio\":\"Бровин Андрей Николаевич\",\"department_fio\":\"Бровин Андрей Николаевич (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"2a6ceeb5-429d-4fc1-8238-3dbd6c3598a2\":{\"id\":\"2a6ceeb5-429d-4fc1-8238-3dbd6c3598a2\",\"last_name\":\"Егоров\",\"first_name_one\":\"А\",\"first_name\":\"Александр\",\"middle_name\":\"Дмитриевич\",\"middle_name_one\":\"Д\",\"fio\":\"Егоров Александр Дмитриевич\",\"department_fio\":\"Егоров Александр Дмитриевич (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"760a5cea-fbda-438d-8efa-b20043d432fd\":{\"id\":\"760a5cea-fbda-438d-8efa-b20043d432fd\",\"last_name\":\"Розанов\",\"first_name_one\":\"А\",\"first_name\":\"Алексей\",\"middle_name\":\"Сергеевич\",\"middle_name_one\":\"С\",\"fio\":\"Розанов Алексей Сергеевич\",\"department_fio\":\"Розанов Алексей Сергеевич (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"91e5b8aa-031d-4ebc-bbab-c300c32e461c\":{\"id\":\"91e5b8aa-031d-4ebc-bbab-c300c32e461c\",\"last_name\":\"Лапшин\",\"first_name_one\":\"Е\",\"first_name\":\"Евгений\",\"middle_name\":\"Витальевич\",\"middle_name_one\":\"В\",\"fio\":\"Лапшин Евгений Витальевич\",\"department_fio\":\"Лапшин Евгений Витальевич (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"6c159739-052f-412f-a2be-da2709c7924b\":{\"id\":\"6c159739-052f-412f-a2be-da2709c7924b\",\"last_name\":\"Дахневич\",\"first_name_one\":\"А\",\"first_name\":\"Анастасия\",\"middle_name\":\"Ярославовна\",\"middle_name_one\":\"Я\",\"fio\":\"Дахневич Анастасия Ярославовна\",\"department_fio\":\"Дахневич Анастасия Ярославовна (Направление \\\"Медицинская биотехнология\\\")\",\"department\":\"Направление \\\"Медицинская биотехнология\\\"\"},\"821b1ffc-b389-4513-bd59-1f258288cf7e\":{\"id\":\"821b1ffc-b389-4513-bd59-1f258288cf7e\",\"last_name\":\"Чувпило\",\"first_name_one\":\"С\",\"first_name\":\"Сергей\",\"middle_name\":\"Альбертович\",\"middle_name_one\":\"А\",\"fio\":\"Чувпило Сергей Альбертович\",\"department_fio\":\"Чувпило Сергей Альбертович (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"bbdfb9b5-c170-4941-87ce-c8a6ba4fd4ca\":{\"id\":\"bbdfb9b5-c170-4941-87ce-c8a6ba4fd4ca\",\"last_name\":\"Ряполова\",\"first_name_one\":\"А\",\"first_name\":\"Анастасия\",\"middle_name\":\"Владимировна\",\"middle_name_one\":\"В\",\"fio\":\"Ряполова Анастасия Владимировна\",\"department_fio\":\"Ряполова Анастасия Владимировна (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"}},\"currentRouteName\":\"teacher.grid\",\"watching\":false,\"events\":[],\"eventElement\":[],\"statusInit\":true,\"lectures\":true,\"seminars\":true,\"practices\":true,\"laboratories\":true,\"exams\":true,\"other\":true,\"width\":null,\"height\":null},\"dataMeta\":{\"collections\":[\"teachersList\"]},\"checksum\":\"612d2bf9378255b6c219e2f340b9635fbcc159f1071babad9afea68d1c332132\"},\"updates\":[{\"type\":\"callMethod\",\"payload\":{\"id\":\"hoya\",\"method\":\"render\",\"params\":[]}},{\"type\":\"callMethod\",\"payload\":{\"id\":\"v46c\",\"method\":\"$set\",\"params\":[\"width\",630]}},{\"type\":\"callMethod\",\"payload\":{\"id\":\"ht14w12l\",\"method\":\"$set\",\"params\":[\"height\",705]}}]}";
 
         Connection.Response response = getConnection(test);
-        String decodedString = StringEscapeUtils.unescapeJava(response.body());
-        htmlHash = extractValueFromJson(decodedString, "htmlHash");
-        checkSum = extractValueFromJson(decodedString, "checksum");
-        return buildSecondRequest();
     }
 
     public Schedule thirdConnectionToSchedule(String teacher, int week) throws IOException {
-        log.info("GroupScheduleService: thirdConnectionToSchedule()");
+        log.info("TeacherScheduleService: start thirdConnectionToSchedule(): {}, {}", teacher, week);
 
         String s = "{\"fingerprint\":{\"id\":\"OCJfQ1wuIX8LrktEfdXe\",\"name\":\"teachers.teacher-main-grid\",\"locale\":\"ru\",\"path\":\"teacher\",\"method\":\"GET\",\"v\":\"acj\"},\"serverMemo\":{\"children\":[],\"errors\":[],\"htmlHash\":\"6bff9b76\",\"data\":{\"year\":\"2024\",\"date\":\"15.10.2024\",\"month\":{\"number\":\"10\",\"full\":\"Октябрь\",\"fullForDisplay\":\"Октября\"},\"numWeek\":7,\"addNumWeek\":0,\"minusNumWeek\":0,\"count\":0,\"type\":\"grid\",\"gridRoute\":\"schedule.teachers.grid\",\"listRoute\":\"schedule.teachers.main\",\"search\":\"Кара\",\"teacherName\":\"\",\"teacher\":\"\",\"teacherShow\":true,\"teachersList\":{\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\":{\"id\":\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\",\"last_name\":\"Карабельский\",\"first_name_one\":\"А\",\"first_name\":\"Александр\",\"middle_name\":\"Владимирович\",\"middle_name_one\":\"В\",\"fio\":\"Карабельский Александр Владимирович\",\"department_fio\":\"Карабельский Александр Владимирович (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"f6b3a33c-0316-41d6-9216-e11cc334f53f\":{\"id\":\"f6b3a33c-0316-41d6-9216-e11cc334f53f\",\"last_name\":\"Каранский\",\"first_name_one\":\"В\",\"first_name\":\"Виталий\",\"middle_name\":\"Владиславович\",\"middle_name_one\":\"В\",\"fio\":\"Каранский Виталий Владиславович\",\"department_fio\":\"Каранский Виталий Владиславович (Колледж Автономной некоммерческой образовательной организации высшего образования «Научно-технологический университет «Сириус»)\",\"department\":\"Колледж Автономной некоммерческой образовательной организации высшего образования «Научно-технологический университет «Сириус»\"},\"41970629-e8d9-4232-95a9-3721bf6749d9\":{\"id\":\"41970629-e8d9-4232-95a9-3721bf6749d9\",\"last_name\":\"Карагозян\",\"first_name_one\":\"Л\",\"first_name\":\"Лиана\",\"middle_name\":\"Диграновна\",\"middle_name_one\":\"Д\",\"fio\":\"Карагозян Лиана Диграновна\",\"department_fio\":\"Карагозян Лиана Диграновна (Президентский Лицей «Сириус»)\",\"department\":\"Президентский Лицей «Сириус»\"},\"3e07ed04-c78f-4f4a-b326-fb9c69094be6\":{\"id\":\"3e07ed04-c78f-4f4a-b326-fb9c69094be6\",\"last_name\":\"Карапетьянц\",\"first_name_one\":\"Н\",\"first_name\":\"Николай\",\"middle_name\":\"\",\"fio\":\"Карапетьянц Николай\",\"department_fio\":\"Карапетьянц Николай (Научный центр информационных технологий и искусственного интеллекта)\",\"department\":\"Научный центр информационных технологий и искусственного интеллекта\"}},\"currentRouteName\":\"teacher.grid\",\"watching\":false,\"events\":[],\"eventElement\":[],\"statusInit\":true,\"lectures\":true,\"seminars\":true,\"practices\":true,\"laboratories\":true,\"exams\":true,\"other\":true,\"width\":630,\"height\":705},\"dataMeta\":{\"collections\":[\"teachersList\"]},\"checksum\":\"9fb23f726ca0b0493fcff10ce8a62da46ee7c39b5c25b159ff6e560426e32bab\"},\"updates\":[{\"type\":\"callMethod\",\"payload\":{\"id\":\"uxcd\",\"method\":\"set\",\"params\":[\"teacherId\"]}}";
         String teacherId = "f6b3a33c-0316-41d6-9216-e11cc334f53f";
@@ -153,8 +154,6 @@ public class TeacherScheduleService {
         htmlSchedule = htmlSchedule.substring(0, startIndex) + htmlSchedule.substring(endIndex);
         htmlSchedule = htmlSchedule.substring(0, endIndex2-14);
 
-        System.out.println(htmlSchedule);
-
         return parseSchedule(htmlSchedule);
     }
 
@@ -169,16 +168,6 @@ public class TeacherScheduleService {
                 .ignoreContentType(true)
                 .method(Connection.Method.POST)
                 .execute();
-    }
-
-    private String extractValueFromJson(String jsonString, String key) {
-        String regex = key + "\":\"([^\"]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(jsonString);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
     }
 
     private String extractValueFromHtml(String html, String key) {
@@ -216,21 +205,6 @@ public class TeacherScheduleService {
         Update update2 = new Update("callMethod", payload2);
 
         return new Request(fingerprint, serverMemo, List.of(update, update1, update2));
-    }
-
-    private Request buildSecondRequest() {
-        Fingerprint fingerprint = new Fingerprint(wireId, "teachers.teacher-main-grid", "ru", "teacher", "GET", "acj");
-        ServerMemo serverMemo = createServerMemo(null, true, 630, 705, null);
-
-        Payload payload = Payload.builder()
-                .id("w887")
-                .method("render")
-                .params(new ArrayList<>())
-                .build();
-
-        Update update = new Update("callMethod", payload);
-
-        return new Request(fingerprint, serverMemo, List.of(update));
     }
 
     private ServerMemo createServerMemo(String search, boolean statusInit, Integer width, Integer height, Map<String, Object> teachersList) {
