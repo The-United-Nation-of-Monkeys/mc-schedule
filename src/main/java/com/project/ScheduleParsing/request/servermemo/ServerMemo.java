@@ -1,6 +1,5 @@
 package com.project.ScheduleParsing.request.servermemo;
 
-import com.google.gson.annotations.SerializedName;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.NoArgsConstructor;
