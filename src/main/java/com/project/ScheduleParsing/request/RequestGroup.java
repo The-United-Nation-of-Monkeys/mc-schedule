@@ -11,7 +11,7 @@ import java.util.List;
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
-public class Request {
+public class RequestGroup {
 
     private Fingerprint fingerprint;
     private ServerMemo serverMemo;

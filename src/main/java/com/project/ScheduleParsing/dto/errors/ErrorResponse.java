@@ -1,4 +1,4 @@
-package com.project.ScheduleParsing.dto;
+package com.project.ScheduleParsing.dto.errors;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

@@ -1,6 +1,6 @@
 package com.project.ScheduleParsing.controller;
 
-import com.project.ScheduleParsing.dto.ErrorResponse;
+import com.project.ScheduleParsing.dto.errors.ErrorResponse;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

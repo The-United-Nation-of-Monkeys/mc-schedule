@@ -7,7 +7,7 @@ import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Fingerprint;
-import com.project.ScheduleParsing.request.Request;
+import com.project.ScheduleParsing.request.RequestGroup;
 import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
 import com.project.ScheduleParsing.request.updates.Update;
@@ -54,17 +54,17 @@ public class GroupScheduleService {
     public Schedule getScheduleByGroup(String group, Integer week) {
         log.info("GroupScheduleService: start getScheduleByGroup(): group - {}, week - {}", group, week);
         try {
-            Request request1 = firstConnectionToSchedule();
-            Request request2 = secondConnectionToSchedule(request1);
-            Request request3 = thirdConnectionToSchedule(request2, group, week);
-            return lastConnectionToSchedule(request3);
+            RequestGroup requestGroup1 = firstConnectionToSchedule();
+            RequestGroup requestGroup2 = secondConnectionToSchedule(requestGroup1);
+            RequestGroup requestGroup3 = thirdConnectionToSchedule(requestGroup2, group, week);
+            return lastConnectionToSchedule(requestGroup3);
         } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException(ex.getMessage());
         }
     }
 
-    public Request firstConnectionToSchedule() throws IOException {
+    public RequestGroup firstConnectionToSchedule() throws IOException {
         log.info("GroupScheduleService: start firstConnectionToSchedule()");
         String scheduleUrl = "https://schedule.siriusuniversity.ru/";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
@@ -99,29 +99,29 @@ public class GroupScheduleService {
         return buildFirstRequest();
     }
 
-    public Request secondConnectionToSchedule(Request firstRequest) throws IOException {
+    public RequestGroup secondConnectionToSchedule(RequestGroup firstRequestGroup) throws IOException {
         log.info("GroupScheduleService: start secondConnectionToSchedule()");
 
-        Connection.Response response = getConnection(firstRequest);
+        Connection.Response response = getConnection(firstRequestGroup);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
         htmlHash = extractValueFromJson(decodedString, "htmlHash");
         checkSum = extractValueFromJson(decodedString, "checksum");
         return buildSecondRequest();
     }
 
-    public Request thirdConnectionToSchedule(Request secondRequest, String group, Integer week) throws IOException {
+    public RequestGroup thirdConnectionToSchedule(RequestGroup secondRequestGroup, String group, Integer week) throws IOException {
         log.info("GroupScheduleService: start thirdConnectionToSchedule(): {}, {}", group, week);
 
-        Connection.Response response = getConnection(secondRequest);
+        Connection.Response response = getConnection(secondRequestGroup);
         String responseBody = response.body();
         checkSum = extractValueFromJson(responseBody, "checksum");
         return buildThirdRequest(group, week);
     }
 
-    public Schedule lastConnectionToSchedule(Request thirdRequest) throws IOException {
+    public Schedule lastConnectionToSchedule(RequestGroup thirdRequestGroup) throws IOException {
         log.info("GroupScheduleService: start lastConnectionToSchedule()");
 
-        Connection.Response lastResponse = getConnection(thirdRequest);
+        Connection.Response lastResponse = getConnection(thirdRequestGroup);
 
         String responseBody = lastResponse.body();
         String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
@@ -140,14 +140,14 @@ public class GroupScheduleService {
         return parseSchedule(htmlSchedule);
     }
 
-    private Connection.Response getConnection(Request request) throws IOException {
+    private Connection.Response getConnection(RequestGroup requestGroup) throws IOException {
         return Jsoup.connect("https://schedule.siriusuniversity.ru/livewire/message/main-grid")
                 .header("Content-Length", String.valueOf(1863))
                 .header("Content-Type", "application/json")
                 .header("Cookie", xsrfToken + "; " + siriusSession)
                 .header("X-Csrf-Token", liveWireToken)
                 .header("X-Livewire", "true")
-                .requestBody(gson.toJson(request))
+                .requestBody(gson.toJson(requestGroup))
                 .ignoreContentType(true)
                 .method(Connection.Method.POST)
                 .execute();
@@ -173,7 +173,7 @@ public class GroupScheduleService {
         return null;
     }
 
-    private Request buildFirstRequest() {
+    private RequestGroup buildFirstRequest() {
         Fingerprint fingerprint = new Fingerprint(wireId, "main-grid", "ru", "/", "GET", "acj");
         ServerMemo serverMemo = createServerMemo("", false, null, null);
 
@@ -197,10 +197,10 @@ public class GroupScheduleService {
         Update update1 = new Update("callMethod", payload1);
         Update update2 = new Update("callMethod", payload2);
 
-        return new Request(fingerprint, serverMemo, List.of(update, update1, update2));
+        return new RequestGroup(fingerprint, serverMemo, List.of(update, update1, update2));
     }
 
-    private Request buildSecondRequest() {
+    private RequestGroup buildSecondRequest() {
         Fingerprint fingerprint = new Fingerprint(wireId, "main-grid", "ru", "/", "GET", "acj");
         ServerMemo serverMemo = createServerMemo(null, true, 630, 705);
 
@@ -212,10 +212,10 @@ public class GroupScheduleService {
 
         Update update = new Update("callMethod", payload);
 
-        return new Request(fingerprint, serverMemo, List.of(update));
+        return new RequestGroup(fingerprint, serverMemo, List.of(update));
     }
 
-    private Request buildThirdRequest(String group, Integer week) {
+    private RequestGroup buildThirdRequest(String group, Integer week) {
         Fingerprint fingerprint = new Fingerprint(wireId, "main-grid", "ru", "/", "GET", "acj");
         ServerMemo serverMemo = createServerMemo(null, true, 630, 705);
 
@@ -248,7 +248,7 @@ public class GroupScheduleService {
             updates.add(new Update("callMethod", newPayload));
         }
 
-        return new Request(fingerprint, serverMemo, updates);
+        return new RequestGroup(fingerprint, serverMemo, updates);
     }
 
     private ServerMemo createServerMemo(String search, boolean statusInit, Integer width, Integer height) {

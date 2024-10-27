@@ -1,10 +1,7 @@
 package com.project.ScheduleParsing.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.google.gson.reflect.TypeToken;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
 import com.project.ScheduleParsing.dto.Day;
 import com.project.ScheduleParsing.dto.Pair;
@@ -19,18 +16,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringEscapeUtils;
 import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.lang.reflect.Type;
-import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -63,16 +56,15 @@ public class TeacherScheduleService {
 
     public Schedule getScheduleByTeacher(String teacher, int week) {
         log.info("TeacherScheduleService: start getScheduleByTeacher(): {}, {}", teacher, week);
+
         try {
             String request1 = firstConnectionToSchedule();
             RequestTeacher requestTeacher2 = secondConnectionToSchedule(teacher, week, request1);
-
             return finalConnectionToSchedule(requestTeacher2);
         } catch (Exception ex) {
             log.error(ex.getMessage());
-            throw new ScheduleNotFoundException(ex.getMessage());
+            throw new ScheduleNotFoundException("Во время поиска расписания произошла ошибка, повторите попытку позже.");
         }
-
     }
 
     public String firstConnectionToSchedule() throws IOException {
@@ -173,10 +165,7 @@ public class TeacherScheduleService {
             }
         }
 
-        RequestTeacher secondRequest = buildSecondRequest(teacherName, week, teachersList);
-        log.info(gson.toJson(secondRequest));
-
-        return secondRequest;
+        return buildSecondRequest(teacherName, week, teachersList);
     }
 
     public Schedule finalConnectionToSchedule( RequestTeacher firstRequest) throws IOException {
@@ -195,12 +184,10 @@ public class TeacherScheduleService {
         String r2 = htmlSchedule.substring(endIndex2+7);
         String res = r1.concat(r2);
 
-        return parseSchedule2(res);
-
-        //return parseSchedule(teacher, html);
+        return parseSchedule(res);
     }
 
-    public Schedule parseSchedule2(String json) throws JsonProcessingException {
+    public Schedule parseSchedule(String json) {
         JSONObject jsonObject = new JSONObject(json);
         JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
         JSONObject events = data.getJSONObject("events");
@@ -211,9 +198,13 @@ public class TeacherScheduleService {
             Object eventObject = events.get(key);
             if (eventObject instanceof JSONObject event) {
                 Day day = getDayFromJSONObject(event, key);
-                days.set(getDayIndex(day.getDayWeek()), day);
-            } else {
+                days.set(getDayIndex(key.split(",")[0]), day);
+            } else if (eventObject instanceof JSONArray) {
                 JSONArray eventArray = events.getJSONArray(key);
+                Day day = getDayFromJSONArray(eventArray, key);
+                days.set(getDayIndex(key.split(",")[0]), day);
+            } else {
+                days.set(getDayIndex(key.split(",")[0]), null);
             }
         }
 
@@ -253,58 +244,62 @@ public class TeacherScheduleService {
             pairs.add(List.of(pair));
         }
 
+        day.setPairCount(pairs.size());
         day.setPairList(pairs);
         return day;
     }
 
-    public int getDayIndex(String day) {
-        return switch (day.toUpperCase()) {
-            case "ПН" -> 0;
-            case "ВТ" -> 1;
-            case "СР" -> 2;
-            case "ЧТ" -> 3;
-            case "ПТ" -> 4;
-            case "СБ" -> 5;
-            case "ВС" -> 6;
-            default -> throw new IllegalArgumentException("Некорректный день недели: " + day);
-        };
-    }
+    private Day getDayFromJSONArray(JSONArray jsonArray, String key) {
+        Day day = new Day();
+        day.setFullDayName(key);
+        List<List<Pair>> pairs = new ArrayList<>();
 
+        boolean first = true;
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray pairDataArr = jsonArray.getJSONArray(i);
+            List<Pair> pairModule = new ArrayList<>();
+            for (int j = 0; j < pairDataArr.length(); j++) {
+                JSONObject pairData = pairDataArr.getJSONObject(j);
 
+                LocalDate date = LocalDate.parse(pairData.getString("date"), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+                if (first) {
+                    day.setDay(date.getDayOfMonth());
+                    day.setMonth(date.getMonthValue());
+                    day.setYear(date.getYear());
+                    day.setDayWeek(pairData.getString("dayWeek"));
+                    first = false;
+                }
 
+                JSONObject teacherJson = pairData.getJSONObject("teachers");
+                List<Teacher> teachers = new ArrayList<>();
+                for (String teacherKey : teacherJson.keySet()) {
+                    Teacher teacher = gson.fromJson(teacherJson.getJSONObject(teacherKey).toString(), Teacher.class);
+                    teachers.add(teacher);
+                }
 
-
-    public Schedule thirdConnectionToSchedule(String teacher, int week) throws IOException {
-        log.info("TeacherScheduleService: start thirdConnectionToSchedule(): {}, {}", teacher, week);
-
-        String s = "{\"fingerprint\":{\"id\":\"OCJfQ1wuIX8LrktEfdXe\",\"name\":\"teachers.teacher-main-grid\",\"locale\":\"ru\",\"path\":\"teacher\",\"method\":\"GET\",\"v\":\"acj\"},\"serverMemo\":{\"children\":[],\"errors\":[],\"htmlHash\":\"6bff9b76\",\"data\":{\"year\":\"2024\",\"date\":\"15.10.2024\",\"month\":{\"number\":\"10\",\"full\":\"Октябрь\",\"fullForDisplay\":\"Октября\"},\"numWeek\":7,\"addNumWeek\":0,\"minusNumWeek\":0,\"count\":0,\"type\":\"grid\",\"gridRoute\":\"schedule.teachers.grid\",\"listRoute\":\"schedule.teachers.main\",\"search\":\"Кара\",\"teacherName\":\"\",\"teacher\":\"\",\"teacherShow\":true,\"teachersList\":{\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\":{\"id\":\"1ac9b76c-2c7a-46fa-a555-a49226d7c58b\",\"last_name\":\"Карабельский\",\"first_name_one\":\"А\",\"first_name\":\"Александр\",\"middle_name\":\"Владимирович\",\"middle_name_one\":\"В\",\"fio\":\"Карабельский Александр Владимирович\",\"department_fio\":\"Карабельский Александр Владимирович (Направление \\\"Генная терапия\\\")\",\"department\":\"Направление \\\"Генная терапия\\\"\"},\"f6b3a33c-0316-41d6-9216-e11cc334f53f\":{\"id\":\"f6b3a33c-0316-41d6-9216-e11cc334f53f\",\"last_name\":\"Каранский\",\"first_name_one\":\"В\",\"first_name\":\"Виталий\",\"middle_name\":\"Владиславович\",\"middle_name_one\":\"В\",\"fio\":\"Каранский Виталий Владиславович\",\"department_fio\":\"Каранский Виталий Владиславович (Колледж Автономной некоммерческой образовательной организации высшего образования «Научно-технологический университет «Сириус»)\",\"department\":\"Колледж Автономной некоммерческой образовательной организации высшего образования «Научно-технологический университет «Сириус»\"},\"41970629-e8d9-4232-95a9-3721bf6749d9\":{\"id\":\"41970629-e8d9-4232-95a9-3721bf6749d9\",\"last_name\":\"Карагозян\",\"first_name_one\":\"Л\",\"first_name\":\"Лиана\",\"middle_name\":\"Диграновна\",\"middle_name_one\":\"Д\",\"fio\":\"Карагозян Лиана Диграновна\",\"department_fio\":\"Карагозян Лиана Диграновна (Президентский Лицей «Сириус»)\",\"department\":\"Президентский Лицей «Сириус»\"},\"3e07ed04-c78f-4f4a-b326-fb9c69094be6\":{\"id\":\"3e07ed04-c78f-4f4a-b326-fb9c69094be6\",\"last_name\":\"Карапетьянц\",\"first_name_one\":\"Н\",\"first_name\":\"Николай\",\"middle_name\":\"\",\"fio\":\"Карапетьянц Николай\",\"department_fio\":\"Карапетьянц Николай (Научный центр информационных технологий и искусственного интеллекта)\",\"department\":\"Научный центр информационных технологий и искусственного интеллекта\"}},\"currentRouteName\":\"teacher.grid\",\"watching\":false,\"events\":[],\"eventElement\":[],\"statusInit\":true,\"lectures\":true,\"seminars\":true,\"practices\":true,\"laboratories\":true,\"exams\":true,\"other\":true,\"width\":630,\"height\":705},\"dataMeta\":{\"collections\":[\"teachersList\"]},\"checksum\":\"9fb23f726ca0b0493fcff10ce8a62da46ee7c39b5c25b159ff6e560426e32bab\"},\"updates\":[{\"type\":\"callMethod\",\"payload\":{\"id\":\"uxcd\",\"method\":\"set\",\"params\":[\"teacherId\"]}}";
-        String teacherId = getTeacherId(teacher);
-        StringBuilder sb = new StringBuilder(s.replace("teacherId", teacherId));
-
-        if (week == 0) {
-            sb.append("]}");
-        } else if (week > 0) {
-            sb.append(",{\"type\":\"callMethod\",\"payload\":{\"id\":\"lgs4h\",\"method\":\"addWeek\",\"params\":[]}}".repeat(week)).append("]}");
-        } else {
-            sb.append(",{\"type\":\"callMethod\",\"payload\":{\"id\":\"lgs4h\",\"method\":\"minusWeek\",\"params\":[]}}".repeat(week*(-1))).append("]}");
+                Pair pair = gson.fromJson(pairData.toString(), Pair.class);
+                pair.setTeachers(teachers);
+                pairModule.add(pair);
+            }
+            pairs.add(pairModule);
         }
 
-        Connection.Response response = getConnection(sb.toString());
-        String responseBody = response.body();
-        String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
+        day.setPairCount(pairs.size());
+        day.setPairList(pairs);
+        return day;
+    }
 
-        String startMarker = "{\"effects\":{\"html\":\"<div wire:id=\"";
-        String endMarker = "<div wire:id";
-        String endMarker2 = "</div>";
-
-        int startIndex = htmlSchedule.indexOf(startMarker);
-        int endIndex = htmlSchedule.indexOf(endMarker, startIndex);
-        int endIndex2 = htmlSchedule.lastIndexOf(endMarker2);
-
-        htmlSchedule = htmlSchedule.substring(0, startIndex) + htmlSchedule.substring(endIndex);
-        htmlSchedule = htmlSchedule.substring(0, endIndex2-14);
-
-        return parseSchedule(teacher, htmlSchedule);
+    private int getDayIndex(String day) {
+        return switch (day) {
+            case "Понедельник" -> 0;
+            case "Вторник" -> 1;
+            case "Среда" -> 2;
+            case "Четверг" -> 3;
+            case "Пятница" -> 4;
+            case "Суббота" -> 5;
+            case "Воскресенье" -> 6;
+            default -> throw new IllegalArgumentException("Некорректный день недели: " + day);
+        };
     }
 
     private Connection.Response getConnection(String request) throws IOException {
@@ -320,30 +315,10 @@ public class TeacherScheduleService {
                 .execute();
     }
 
-    private String extractValueFromHtml(String html, String key) {
-        String regex = key + "&quot;:&quot;([^&quot;]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(html);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    private String extractValueFromJson(String jsonString, String key) {
-        String regex = key + "\":\"([^\"]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(jsonString);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
     private RequestTeacher buildSecondRequest(String teacherName, int week, Map<String, Object> teachersList) {
         Fingerprint fingerprint = new Fingerprint(wireId, "teachers.teacher-main-grid", "ru", "teacher", "GET", "acj");
         Effects effects = new Effects();
-        ServerMemo serverMemo = createServerMemo(null, true, 630, 705, teachersList);
+        ServerMemo serverMemo = createServerMemo(teachersList);
 
         List<Update> updates = new ArrayList<>();
         Payload payload = Payload.builder()
@@ -378,7 +353,7 @@ public class TeacherScheduleService {
         return new RequestTeacher(fingerprint, effects, serverMemo, updates);
     }
 
-    private ServerMemo createServerMemo(String search, boolean statusInit, Integer width, Integer height, Map<String, Object> teachersList) {
+    private ServerMemo createServerMemo(Map<String, Object> teachersList) {
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
@@ -399,7 +374,7 @@ public class TeacherScheduleService {
                 .type("grid")
                 .gridRoute("schedule.teachers.grid")
                 .listRoute("schedule.teachers.main")
-                .search(search)
+                .search(null)
                 .teacherName("")
                 .teacher("")
                 .teacherShow(true)
@@ -408,15 +383,15 @@ public class TeacherScheduleService {
                 .eventElement(new ArrayList<>())
                 .watching(false)
                 .currentRouteName("teacher.grid")
-                .statusInit(statusInit)
+                .statusInit(true)
                 .lectures(true)
                 .seminars(true)
                 .practices(true)
                 .laboratories(true)
                 .exams(true)
                 .other(true)
-                .width(width)
-                .height(height)
+                .width(630)
+                .height(705)
                 .build();
 
         DataMetaForTeacher dataMetaForGroup = DataMetaForTeacher.builder()
@@ -433,74 +408,28 @@ public class TeacherScheduleService {
                 .build();
     }
 
-    private Schedule parseSchedule(String teacher, String htmlSchedule) {
-        List<Day> days = new ArrayList<>();
-        Document document = Jsoup.parse(htmlSchedule);
-        Elements date = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-        Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-        Element lastPair = document.select("div.display-contents").first();
-
-        for (int j = 1; j < headers.size() + 1; j++) {
-            Element firstHeader = headers.get(j-1);
-            Element secondHeader;
-
-            if (j == headers.size()) {
-                secondHeader = lastPair;
-            } else {
-                secondHeader = headers.get(j);
-            }
-
-            Element currentElement = firstHeader.nextElementSibling();
-            StringBuilder result = new StringBuilder();
-            while (currentElement != null && !currentElement.equals(secondHeader)) {
-                result.append(currentElement.outerHtml());
-                currentElement = currentElement.nextElementSibling();
-            }
-
-            Document docPair = Jsoup.parse(result.toString());
-            int size = docPair.select(".text-gray-400.text-sm.pl-1").size();
-            List<Pair> pairs = new ArrayList<>();
-
-            for(int i = 0; i < size; i++) {
-                String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
-                String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
-                String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
-                String pairTime = docPair.select(".ml-auto.text-sm").get(i).text();
-                Elements pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span.line-clamp-2");
-                Elements pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold");
-
-                Optional<String> optTeacher = (i < pairTeachers.size()) ? Optional.of(pairTeachers.get(i).text()) : Optional.empty();
-                Optional<String> optLocation = (i < pairLocation.size()) ? Optional.of(pairLocation.get(i).text()) : Optional.empty();
-
-                pairs.add(Pair.builder()
-                        .pairNumber(Integer.valueOf(pairNumber))
-                        .pairType(pairType)
-                        .pairName(pairName)
-                        .pairTeacher(optTeacher.orElse(""))
-                        .pairLocation(optLocation.orElse(""))
-                        .pairTime(pairTime)
-                        .build());
-            }
-
-            String[] fullDate = date.get(j - 1).text().split(", ")[1].split(" ");
-            LocalDate localDate = LocalDate.of(2024, MonthForFront.valueOf(fullDate[1]).ordinal() + 1, Integer.parseInt(fullDate[0]));
-
-            days.add(Day.builder()
-                    .day(localDate.getDayOfMonth())
-                    .month(localDate.getMonthValue())
-                    .pairCount(pairs.size())
-                    .pairs(pairs)
-                    .build());
+    private String extractValueFromHtml(String html, String key) {
+        String regex = key + "&quot;:&quot;([^&quot;]*)";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(html);
+        if (matcher.find()) {
+            return matcher.group(1);
         }
+        return null;
+    }
 
-        return Schedule.builder()
-                .days(days)
-                .build();
+    private String extractValueFromJson(String jsonString, String key) {
+        String regex = key + "\":\"([^\"]*)";
+        Pattern pattern = Pattern.compile(regex);
+        Matcher matcher = pattern.matcher(jsonString);
+        if (matcher.find()) {
+            return matcher.group(1);
+        }
+        return null;
     }
 
     private String getTeacherId(String fio) {
         com.project.ScheduleParsing.model.Teacher teacher = teacherRepository.findTeacherByFio(fio);
         return String.valueOf(teacher.getId());
     }
-
 }
