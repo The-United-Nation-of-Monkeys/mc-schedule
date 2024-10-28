@@ -7,7 +7,7 @@ import java.util.List;
 
 @Data
 @Builder
-public class DataMetaForTeacher {
+public class DataMetaForTeacherAndAuditory {
 
     private List<String> collections;
 }

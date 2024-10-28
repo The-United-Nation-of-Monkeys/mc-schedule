@@ -59,8 +59,8 @@ public class TeacherScheduleService {
 
         try {
             String request1 = firstConnectionToSchedule();
-            RequestTeacher requestTeacher2 = secondConnectionToSchedule(teacher, week, request1);
-            return finalConnectionToSchedule(requestTeacher2);
+            RequestTeacherAndAuditory requestTeacherAndAuditory2 = secondConnectionToSchedule(teacher, week, request1);
+            return finalConnectionToSchedule(requestTeacherAndAuditory2);
         } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException("Во время поиска расписания произошла ошибка, повторите попытку позже.");
@@ -137,7 +137,7 @@ public class TeacherScheduleService {
                 }""");
     }
 
-    public RequestTeacher secondConnectionToSchedule(String teacherName, int week, String firstRequest) throws IOException {
+    public RequestTeacherAndAuditory secondConnectionToSchedule(String teacherName, int week, String firstRequest) throws IOException {
         log.info("TeacherScheduleService: start secondConnectionToSchedule()");
 
         Connection.Response response = getConnection(firstRequest);
@@ -168,7 +168,7 @@ public class TeacherScheduleService {
         return buildSecondRequest(teacherName, week, teachersList);
     }
 
-    public Schedule finalConnectionToSchedule( RequestTeacher firstRequest) throws IOException {
+    public Schedule finalConnectionToSchedule(RequestTeacherAndAuditory firstRequest) throws IOException {
         log.info("TeacherScheduleService: start finalConnectionToSchedule()");
 
         Connection.Response response = getConnection(gson.toJson(firstRequest));
@@ -315,7 +315,7 @@ public class TeacherScheduleService {
                 .execute();
     }
 
-    private RequestTeacher buildSecondRequest(String teacherName, int week, Map<String, Object> teachersList) {
+    private RequestTeacherAndAuditory buildSecondRequest(String teacherName, int week, Map<String, Object> teachersList) {
         Fingerprint fingerprint = new Fingerprint(wireId, "teachers.teacher-main-grid", "ru", "teacher", "GET", "acj");
         Effects effects = new Effects();
         ServerMemo serverMemo = createServerMemo(teachersList);
@@ -350,7 +350,7 @@ public class TeacherScheduleService {
             }
         }
 
-        return new RequestTeacher(fingerprint, effects, serverMemo, updates);
+        return new RequestTeacherAndAuditory(fingerprint, effects, serverMemo, updates);
     }
 
     private ServerMemo createServerMemo(Map<String, Object> teachersList) {
@@ -394,7 +394,7 @@ public class TeacherScheduleService {
                 .height(705)
                 .build();
 
-        DataMetaForTeacher dataMetaForGroup = DataMetaForTeacher.builder()
+        DataMetaForTeacherAndAuditory dataMetaForGroup = DataMetaForTeacherAndAuditory.builder()
                 .collections(List.of("teachersList"))
                 .build();
 

@@ -9,7 +9,7 @@ import java.util.List;
 
 @Data
 @AllArgsConstructor
-public class RequestTeacher {
+public class RequestTeacherAndAuditory {
 
     private Fingerprint fingerprint;
     private Effects effects;
