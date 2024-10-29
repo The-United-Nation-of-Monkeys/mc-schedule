@@ -3,8 +3,6 @@ package com.project.ScheduleParsing.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
-import com.project.ScheduleParsing.dto.Day;
-import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Effects;
@@ -25,17 +23,14 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuditoryScheduleService {
+public class AuditoryScheduleService extends ScheduleService{
 
     private String liveWireToken;
 
@@ -55,6 +50,7 @@ public class AuditoryScheduleService {
 
     public Schedule getScheduleByAuditory(String auditory, int week) {
         log.info("AuditoryScheduleService: start getScheduleByAuditory(): {}, {}", auditory, week);
+
         try {
             String firstRequest = firstConnectionToSchedule();
             RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule(auditory, week, firstRequest);
@@ -64,7 +60,7 @@ public class AuditoryScheduleService {
         }
     }
 
-    public String firstConnectionToSchedule() throws IOException {
+    private String firstConnectionToSchedule() throws IOException {
         log.info("AuditoryScheduleService: start firstConnectionToSchedule()");
         String scheduleUrl = "https://schedule.siriusuniversity.ru/classroom";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
@@ -133,7 +129,7 @@ public class AuditoryScheduleService {
                 }""");
     }
 
-    public RequestTeacherAndAuditory secondConnectionToSchedule(String auditory, int week, String firstRequestGroup) throws IOException {
+    private RequestTeacherAndAuditory secondConnectionToSchedule(String auditory, int week, String firstRequestGroup) throws IOException {
         log.info("AuditoryScheduleService: start secondConnectionToSchedule()");
 
         Connection.Response response = getConnection(firstRequestGroup);
@@ -149,7 +145,7 @@ public class AuditoryScheduleService {
         return buildSecondRequest(auditory, week, classroomList);
     }
 
-    public Schedule lastConnectionToSchedule(RequestTeacherAndAuditory request) throws IOException {
+    private Schedule lastConnectionToSchedule(RequestTeacherAndAuditory request) throws IOException {
 
         Connection.Response response = getConnection(gson.toJson(request));
         String responseBody = response.body();
@@ -165,121 +161,6 @@ public class AuditoryScheduleService {
         String res = r1.concat(r2);
 
         return parseSchedule(res);
-    }
-
-    public Schedule parseSchedule(String json) {
-        JSONObject jsonObject = new JSONObject(json);
-        JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
-        JSONObject events = data.getJSONObject("events");
-
-        List<Day> days = new ArrayList<>(Collections.nCopies(7, null));
-        int allPairCount = data.getInt("count");
-        for (String key : events.keySet()) {
-            Object eventObject = events.get(key);
-            if (eventObject instanceof JSONObject event) {
-                Day day = getDayFromJSONObject(event, key);
-                days.set(getDayIndex(key.split(",")[0]), day);
-            } else if (eventObject instanceof JSONArray) {
-                JSONArray eventArray = events.getJSONArray(key);
-                Day day = getDayFromJSONArray(eventArray, key);
-                days.set(getDayIndex(key.split(",")[0]), day);
-            } else {
-                days.set(getDayIndex(key.split(",")[0]), null);
-            }
-        }
-
-        return Schedule.builder()
-                .allPairCount(allPairCount)
-                .days(days)
-                .build();
-    }
-
-    private Day getDayFromJSONObject(JSONObject jsonObject, String key) {
-        Day day = new Day();
-        day.setFullDayName(key);
-        List<List<Pair>> pairs = new ArrayList<>();
-
-        boolean first = true;
-        for (String pairKey : jsonObject.keySet()) {
-            JSONObject pairData = (JSONObject) jsonObject.getJSONArray(pairKey).get(0);
-
-            LocalDate date = LocalDate.parse(pairData.getString("date"), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
-            if (first) {
-                day.setDay(date.getDayOfMonth());
-                day.setMonth(date.getMonthValue());
-                day.setYear(date.getYear());
-                day.setDayWeek(pairData.getString("dayWeek"));
-                first = false;
-            }
-
-            JSONObject teacherJson = pairData.getJSONObject("teachers");
-            List<Teacher> teachers = new ArrayList<>();
-            for (String teacherKey : teacherJson.keySet()) {
-                Teacher teacher = gson.fromJson(teacherJson.getJSONObject(teacherKey).toString(), Teacher.class);
-                teachers.add(teacher);
-            }
-
-            Pair pair = gson.fromJson(pairData.toString(), Pair.class);
-            pair.setTeachers(teachers);
-            pairs.add(List.of(pair));
-        }
-
-        day.setPairCount(pairs.size());
-        day.setPairList(pairs);
-        return day;
-    }
-
-    private Day getDayFromJSONArray(JSONArray jsonArray, String key) {
-        Day day = new Day();
-        day.setFullDayName(key);
-        List<List<Pair>> pairs = new ArrayList<>();
-
-        boolean first = true;
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONArray pairDataArr = jsonArray.getJSONArray(i);
-            List<Pair> pairModule = new ArrayList<>();
-            for (int j = 0; j < pairDataArr.length(); j++) {
-                JSONObject pairData = pairDataArr.getJSONObject(j);
-
-                LocalDate date = LocalDate.parse(pairData.getString("date"), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
-                if (first) {
-                    day.setDay(date.getDayOfMonth());
-                    day.setMonth(date.getMonthValue());
-                    day.setYear(date.getYear());
-                    day.setDayWeek(pairData.getString("dayWeek"));
-                    first = false;
-                }
-
-                JSONObject teacherJson = pairData.getJSONObject("teachers");
-                List<Teacher> teachers = new ArrayList<>();
-                for (String teacherKey : teacherJson.keySet()) {
-                    Teacher teacher = gson.fromJson(teacherJson.getJSONObject(teacherKey).toString(), Teacher.class);
-                    teachers.add(teacher);
-                }
-
-                Pair pair = gson.fromJson(pairData.toString(), Pair.class);
-                pair.setTeachers(teachers);
-                pairModule.add(pair);
-            }
-            pairs.add(pairModule);
-        }
-
-        day.setPairCount(pairs.size());
-        day.setPairList(pairs);
-        return day;
-    }
-
-    private int getDayIndex(String day) {
-        return switch (day) {
-            case "Понедельник" -> 0;
-            case "Вторник" -> 1;
-            case "Среда" -> 2;
-            case "Четверг" -> 3;
-            case "Пятница" -> 4;
-            case "Суббота" -> 5;
-            case "Воскресенье" -> 6;
-            default -> throw new IllegalArgumentException("Некорректный день недели: " + day);
-        };
     }
 
     private Connection.Response getConnection(String request) throws IOException {
@@ -384,25 +265,5 @@ public class AuditoryScheduleService {
                 .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
                 .build();
-    }
-
-    private String extractValueFromHtml(String html, String key) {
-        String regex = key + "&quot;:&quot;([^&quot;]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(html);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    private String extractValueFromJson(String jsonString, String key) {
-        String regex = key + "\":\"([^\"]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(jsonString);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
     }
 }

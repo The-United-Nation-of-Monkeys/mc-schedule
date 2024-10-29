@@ -11,7 +11,9 @@ import java.util.List;
 @Schema(description = "Расписание")
 public class Schedule {
 
+    @Schema(description = "Общее количество пар за неделю", example = "25")
     private Integer allPairCount;
 
+    @Schema(description = "Список дней")
     private List<Day> days;
 }

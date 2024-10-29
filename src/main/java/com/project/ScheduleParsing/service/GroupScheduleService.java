@@ -2,8 +2,7 @@ package com.project.ScheduleParsing.service;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.project.ScheduleParsing.dto.Day;
-import com.project.ScheduleParsing.dto.Pair;
+import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Fingerprint;
@@ -19,21 +18,17 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
-import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class GroupScheduleService {
+public class GroupScheduleService extends ScheduleService{
 
     private String liveWireToken;
 
@@ -49,7 +44,7 @@ public class GroupScheduleService {
 
     private Integer numWeek;
 
-    private final Gson gson = new GsonBuilder().serializeNulls().create();
+    private final Gson gson = new GsonBuilder().serializeNulls().setExclusionStrategies(new AnnotationExclusionStrategy()).create();
 
     public Schedule getScheduleByGroup(String group, Integer week) {
         log.info("GroupScheduleService: start getScheduleByGroup(): group - {}, week - {}", group, week);
@@ -64,7 +59,7 @@ public class GroupScheduleService {
         }
     }
 
-    public RequestGroup firstConnectionToSchedule() throws IOException {
+    private RequestGroup firstConnectionToSchedule() throws IOException {
         log.info("GroupScheduleService: start firstConnectionToSchedule()");
         String scheduleUrl = "https://schedule.siriusuniversity.ru/";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
@@ -99,7 +94,7 @@ public class GroupScheduleService {
         return buildFirstRequest();
     }
 
-    public RequestGroup secondConnectionToSchedule(RequestGroup firstRequestGroup) throws IOException {
+    private RequestGroup secondConnectionToSchedule(RequestGroup firstRequestGroup) throws IOException {
         log.info("GroupScheduleService: start secondConnectionToSchedule()");
 
         Connection.Response response = getConnection(firstRequestGroup);
@@ -109,7 +104,7 @@ public class GroupScheduleService {
         return buildSecondRequest();
     }
 
-    public RequestGroup thirdConnectionToSchedule(RequestGroup secondRequestGroup, String group, Integer week) throws IOException {
+    private RequestGroup thirdConnectionToSchedule(RequestGroup secondRequestGroup, String group, Integer week) throws IOException {
         log.info("GroupScheduleService: start thirdConnectionToSchedule(): {}, {}", group, week);
 
         Connection.Response response = getConnection(secondRequestGroup);
@@ -118,26 +113,22 @@ public class GroupScheduleService {
         return buildThirdRequest(group, week);
     }
 
-    public Schedule lastConnectionToSchedule(RequestGroup thirdRequestGroup) throws IOException {
+    private Schedule lastConnectionToSchedule(RequestGroup thirdRequestGroup) throws IOException {
         log.info("GroupScheduleService: start lastConnectionToSchedule()");
 
         Connection.Response lastResponse = getConnection(thirdRequestGroup);
-
         String responseBody = lastResponse.body();
-        String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
 
-        String startMarker = "{\"effects\":{\"html\":\"<div wire:id=\"";
-        String endMarker = "<div wire:id";
-        String endMarker2 = "</div>";
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
 
-        int startIndex = htmlSchedule.indexOf(startMarker);
-        int endIndex = htmlSchedule.indexOf(endMarker, startIndex);
-        int endIndex2 = htmlSchedule.lastIndexOf(endMarker2);
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
+        String res = r1.concat(r2);
 
-        htmlSchedule = htmlSchedule.substring(0, startIndex) + htmlSchedule.substring(endIndex);
-        htmlSchedule = htmlSchedule.substring(0, endIndex2-14);
-
-        return parseSchedule(htmlSchedule);
+        return parseSchedule(res);
     }
 
     private Connection.Response getConnection(RequestGroup requestGroup) throws IOException {
@@ -151,26 +142,6 @@ public class GroupScheduleService {
                 .ignoreContentType(true)
                 .method(Connection.Method.POST)
                 .execute();
-    }
-
-    private String extractValueFromJson(String jsonString, String key) {
-        String regex = key + "\":\"([^\"]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(jsonString);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
-    }
-
-    private String extractValueFromHtml(String html, String key) {
-        String regex = key + "&quot;:&quot;([^&quot;]*)";
-        Pattern pattern = Pattern.compile(regex);
-        Matcher matcher = pattern.matcher(html);
-        if (matcher.find()) {
-            return matcher.group(1);
-        }
-        return null;
     }
 
     private RequestGroup buildFirstRequest() {
@@ -239,13 +210,15 @@ public class GroupScheduleService {
                 updates.add(new Update("callMethod", newPayload));
             }
         } else if (week < 0) {
-            Payload newPayload = Payload.builder()
-                    .id("w887")
-                    .method("minusWeek")
-                    .params(new ArrayList<>())
-                    .build();
+            for (int i = week; i < 0; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("minusWeek")
+                        .params(new ArrayList<>())
+                        .build();
 
-            updates.add(new Update("callMethod", newPayload));
+                updates.add(new Update("callMethod", newPayload));
+            }
         }
 
         return new RequestGroup(fingerprint, serverMemo, updates);
@@ -311,71 +284,6 @@ public class GroupScheduleService {
                 .data(dataForGroup)
                 .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
-                .build();
-    }
-
-    private Schedule parseSchedule(String htmlSchedule) {
-        List<Day> days = new ArrayList<>();
-        Document document = Jsoup.parse(htmlSchedule);
-        Elements date = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-        Elements headers = document.select("div.text-sm.font-bold.text-gray-500.pb-2");
-        Element lastPair = document.select("div.display-contents").first();
-
-        for (int j = 1; j < headers.size() + 1; j++) {
-            Element firstHeader = headers.get(j-1);
-            Element secondHeader;
-
-            if (j == headers.size()) {
-                secondHeader = lastPair;
-            } else {
-                secondHeader = headers.get(j);
-            }
-
-            Element currentElement = firstHeader.nextElementSibling();
-            StringBuilder result = new StringBuilder();
-            while (currentElement != null && !currentElement.equals(secondHeader)) {
-                result.append(currentElement.outerHtml());
-                currentElement = currentElement.nextElementSibling();
-            }
-
-            Document docPair = Jsoup.parse(result.toString());
-            int size = docPair.select(".text-gray-400.text-sm.pl-1").size();
-            List<Pair> pairs = new ArrayList<>();
-
-            for(int i = 0; i < size; i++) {
-                String pairNumber = docPair.select(".text-gray-500.font-bold.pr-2.text-sm").get(i).text();
-                String pairType = docPair.select(".text-gray-400.text-sm.pl-1").get(i).text();
-                String pairName = docPair.select(".text-gray-500.font-bold.m-3.mt-0.relative.text-sm").get(i).text();
-                String pairTime = docPair.select(".ml-auto.text-sm").get(i).text();
-                Elements pairTeachers = docPair.select(".text-gray-400.p-3.pt-0.pl-8.text-sm span.line-clamp-2");
-                Elements pairLocation = docPair.select(".relative.text-gray-500.p-3.pt-0.flex.text-sm .font-bold");
-
-                Optional<String> optTeacher = (i < pairTeachers.size()) ? Optional.of(pairTeachers.get(i).text()) : Optional.empty();
-                Optional<String> optLocation = (i < pairLocation.size()) ? Optional.of(pairLocation.get(i).text()) : Optional.empty();
-
-                pairs.add(Pair.builder()
-                        .pairNumber(Integer.valueOf(pairNumber))
-                        .pairType(pairType)
-                        .pairName(pairName)
-                        .pairTeacher(optTeacher.orElse(""))
-                        .pairLocation(optLocation.orElse(""))
-                        .pairTime(pairTime)
-                        .build());
-            }
-
-            String[] fullDate = date.get(j - 1).text().split(", ")[1].split(" ");
-            LocalDate localDate = LocalDate.of(2024, MonthForFront.valueOf(fullDate[1]).ordinal() + 1, Integer.parseInt(fullDate[0]));
-
-            days.add(Day.builder()
-                    .day(localDate.getDayOfMonth())
-                    .month(localDate.getMonthValue())
-                    .pairCount(pairs.size())
-                    .pairs(pairs)
-                    .build());
-        }
-
-        return Schedule.builder()
-                .days(days)
                 .build();
     }
 }
