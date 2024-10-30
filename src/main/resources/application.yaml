@@ -2,13 +2,13 @@ spring:
   application:
     name: ScheduleParsing
 
-  jpa:
-    generate-ddl: true
-    open-in-view: true
-  datasource:
-    url: jdbc:postgresql://localhost:5436/mc_schedule
-    username: postgres
-    password: postgres
+#  jpa:
+#    generate-ddl: true
+#    open-in-view: true
+#  datasource:
+#    url: jdbc:postgresql://localhost:5436/mc_schedule
+#    username: postgres
+#    password: postgres
 
 server:
   port: 8088
