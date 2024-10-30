@@ -1,7 +1,9 @@
 package com.project.ScheduleParsing.controller;
 
+import com.project.ScheduleParsing.dto.ClassroomListResponse;
 import com.project.ScheduleParsing.dto.Schedule;
-import com.project.ScheduleParsing.service.AuditoryScheduleService;
+import com.project.ScheduleParsing.dto.TeachersListResponse;
+import com.project.ScheduleParsing.service.ClassroomScheduleService;
 import com.project.ScheduleParsing.service.GroupScheduleService;
 import com.project.ScheduleParsing.service.TeacherScheduleService;
 import lombok.RequiredArgsConstructor;
@@ -18,7 +20,7 @@ public class ScheduleController {
 
     private final TeacherScheduleService teacherScheduleService;
 
-    private final AuditoryScheduleService auditoryScheduleService;
+    private final ClassroomScheduleService classroomScheduleService;
 
     @GetMapping("/group")
     public ResponseEntity<Schedule> getScheduleByGroup(@RequestParam String group, @RequestParam int week) {
@@ -30,8 +32,18 @@ public class ScheduleController {
         return ResponseEntity.ok(teacherScheduleService.getScheduleByTeacher(teacher, week));
     }
 
-    @GetMapping("/auditory")
+    @GetMapping("/classroom")
     public ResponseEntity<Schedule> getScheduleByAuditory(@RequestParam String auditory, @RequestParam int week) {
-        return ResponseEntity.ok(auditoryScheduleService.getScheduleByAuditory(auditory, week));
+        return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroom(auditory, week));
+    }
+
+    @GetMapping("/teachers")
+    public ResponseEntity<TeachersListResponse> getTeachers(@RequestParam String search) {
+        return ResponseEntity.ok(teacherScheduleService.getTeachers(search));
+    }
+
+    @GetMapping("/classrooms")
+    public ResponseEntity<ClassroomListResponse> getClassrooms(@RequestParam String search) {
+        return ResponseEntity.ok(classroomScheduleService.getClassrooms(search));
     }
 }

@@ -1,3 +1,8 @@
+CREATE TABLE teacher (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    fio VARCHAR(255) NOT NULL
+);
+
 INSERT INTO teacher (id, fio) VALUES
 ('0b25137a-0df6-43b8-a0c0-600464466f82','Чувашов Антон Андреевич'),
 ('1ac9b76c-2c7a-46fa-a555-a49226d7c58b','Карабельский Александр Владимирович'),

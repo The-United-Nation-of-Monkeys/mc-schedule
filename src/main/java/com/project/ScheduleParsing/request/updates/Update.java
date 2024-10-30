@@ -8,5 +8,5 @@ import lombok.Data;
 public class Update {
 
     private String type;
-    private Payload payload;
+    private Object payload;
 }

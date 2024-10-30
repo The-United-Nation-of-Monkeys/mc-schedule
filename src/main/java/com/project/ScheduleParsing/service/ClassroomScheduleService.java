@@ -3,6 +3,7 @@ package com.project.ScheduleParsing.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
+import com.project.ScheduleParsing.dto.ClassroomListResponse;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Effects;
@@ -10,10 +11,11 @@ import com.project.ScheduleParsing.request.Fingerprint;
 import com.project.ScheduleParsing.request.RequestTeacherAndAuditory;
 import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
+import com.project.ScheduleParsing.request.updates.PayloadForTeacher;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.jsoup.Connection;
@@ -30,7 +32,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuditoryScheduleService extends ScheduleService{
+public class ClassroomScheduleService extends ScheduleService{
 
     private String liveWireToken;
 
@@ -48,12 +50,25 @@ public class AuditoryScheduleService extends ScheduleService{
 
     private final Gson gson = new GsonBuilder().serializeNulls().setExclusionStrategies(new AnnotationExclusionStrategy()).create();
 
-    public Schedule getScheduleByAuditory(String auditory, int week) {
-        log.info("AuditoryScheduleService: start getScheduleByAuditory(): {}, {}", auditory, week);
+    public ClassroomListResponse getClassrooms(String search) {
+        log.info("ClassroomScheduleService: start getClassrooms(): {}", search);
 
         try {
             String firstRequest = firstConnectionToSchedule();
-            RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule(auditory, week, firstRequest);
+            RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule("auditory", search, null, 0, firstRequest);
+            return lastConnectionToClassrooms(secondRequest);
+        } catch (IOException ex) {
+            log.error(ex.getMessage());
+            throw new ScheduleNotFoundException(ex.getMessage());
+        }
+    }
+
+    public Schedule getScheduleByClassroom(String auditory, int week) {
+        log.info("ClassroomScheduleService: start getScheduleByAuditory(): {}, {}", auditory, week);
+
+        try {
+            String firstRequest = firstConnectionToSchedule();
+            RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule("schedule", null, auditory, week, firstRequest);
             return lastConnectionToSchedule(secondRequest);
         } catch (IOException e) {
             throw new ScheduleNotFoundException(e.getMessage());
@@ -61,7 +76,8 @@ public class AuditoryScheduleService extends ScheduleService{
     }
 
     private String firstConnectionToSchedule() throws IOException {
-        log.info("AuditoryScheduleService: start firstConnectionToSchedule()");
+        log.info("ClassroomScheduleService: start firstConnectionToSchedule()");
+
         String scheduleUrl = "https://schedule.siriusuniversity.ru/classroom";
         Connection.Response response1 = Jsoup.connect(scheduleUrl)
                 .method(Connection.Method.GET)
@@ -129,8 +145,8 @@ public class AuditoryScheduleService extends ScheduleService{
                 }""");
     }
 
-    private RequestTeacherAndAuditory secondConnectionToSchedule(String auditory, int week, String firstRequestGroup) throws IOException {
-        log.info("AuditoryScheduleService: start secondConnectionToSchedule()");
+    private RequestTeacherAndAuditory secondConnectionToSchedule(String typeRequest, String search, String auditory, int week, String firstRequestGroup) throws IOException {
+        log.info("ClassroomScheduleService: start secondConnectionToSchedule()");
 
         Connection.Response response = getConnection(firstRequestGroup);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
@@ -142,25 +158,48 @@ public class AuditoryScheduleService extends ScheduleService{
         JSONArray classroomArray = data.getJSONArray("classroomsList");
         List<String> classroomList = classroomArray.toList().stream().map(String::valueOf).toList();
 
-        return buildSecondRequest(auditory, week, classroomList);
+        return buildSecondRequest(typeRequest, search, auditory, week, classroomList);
     }
 
     private Schedule lastConnectionToSchedule(RequestTeacherAndAuditory request) throws IOException {
+        log.info("ClassroomScheduleService: start lastConnectionToSchedule()");
 
         Connection.Response response = getConnection(gson.toJson(request));
         String responseBody = response.body();
-        String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
 
-        String startMarker = "\"<div wire:id=\"";
-        String endMarker2 = "</div>";
-        int startIndex = htmlSchedule.indexOf(startMarker);
-        int endIndex2 = htmlSchedule.lastIndexOf(endMarker2);
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
 
-        String r1 = htmlSchedule.substring(0, startIndex+1);
-        String r2 = htmlSchedule.substring(endIndex2+7);
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
         String res = r1.concat(r2);
 
         return parseSchedule(res);
+    }
+
+    private ClassroomListResponse lastConnectionToClassrooms(RequestTeacherAndAuditory request) throws IOException {
+        log.info("ClassroomScheduleService: start lastConnectionToClassrooms()");
+
+        Connection.Response response = getConnection(gson.toJson(request));
+        String responseBody = response.body();
+
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
+
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
+        String res = r1.concat(r2);
+
+        JSONObject jsonObject = new JSONObject(res);
+        JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
+        JSONObject classroomArray = data.getJSONObject("classroomsList");
+        List<String> classroomList = classroomArray.keySet().stream().map(k -> classroomArray.get(k).toString()).toList();
+
+        return new ClassroomListResponse(classroomList.size(), classroomList);
     }
 
     private Connection.Response getConnection(String request) throws IOException {
@@ -176,39 +215,16 @@ public class AuditoryScheduleService extends ScheduleService{
                 .execute();
     }
 
-    private RequestTeacherAndAuditory buildSecondRequest(String auditoryName, int week, List<String> classroomsList) {
+    private RequestTeacherAndAuditory buildSecondRequest(String typeRequest, String search, String auditoryName, int week, List<String> classroomsList) {
         Fingerprint fingerprint = new Fingerprint(wireId, "classroom.classroom-main-grid", "ru", "classroom", "GET", "acj");
         Effects effects = new Effects();
         ServerMemo serverMemo = createServerMemo(classroomsList);
 
-        List<Update> updates = new ArrayList<>();
-        Payload payload = Payload.builder()
-                .id("s7q8i")
-                .method("set")
-                .params(List.of(auditoryName))
-                .build();
-        updates.add(new Update("callMethod", payload));
-
-        if (week > 0 ) {
-            for (int i = 0; i < week; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("addWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
-        } else if (week < 0) {
-            for (int i = week; i < 0; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("minusWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
+        List<Update> updates;
+        if (typeRequest.equals("schedule")) {
+            updates = createUpdates(auditoryName, week);
+        } else {
+            updates = createUpdates(search);
         }
 
         return new RequestTeacherAndAuditory(fingerprint, effects, serverMemo, updates);
@@ -265,5 +281,49 @@ public class AuditoryScheduleService extends ScheduleService{
                 .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
                 .build();
+    }
+
+    private List<Update> createUpdates(String auditoryName, int week) {
+        List<Update> updates = new ArrayList<>();
+        Payload payload = Payload.builder()
+                .id("s7q8i")
+                .method("set")
+                .params(List.of(auditoryName))
+                .build();
+        updates.add(new Update("callMethod", payload));
+
+        if (week > 0 ) {
+            for (int i = 0; i < week; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("addWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        } else if (week < 0) {
+            for (int i = week; i < 0; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("minusWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        }
+        return updates;
+    }
+
+    private List<Update> createUpdates(String search) {
+        List<Update> updates = new ArrayList<>();
+        PayloadForTeacher payload = PayloadForTeacher.builder()
+                .id("gqky")
+                .name("search")
+                .value(search)
+                .build();
+        updates.add(new Update("syncInput", payload));
+        return updates;
     }
 }

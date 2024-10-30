@@ -5,15 +5,17 @@ import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.dto.Teacher;
+import com.project.ScheduleParsing.dto.TeachersListResponse;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.repository.TeacherRepository;
 import com.project.ScheduleParsing.request.*;
 import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
+import com.project.ScheduleParsing.request.updates.PayloadForTeacher;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -49,14 +51,27 @@ public class TeacherScheduleService extends ScheduleService{
 
     private final TeacherRepository teacherRepository;
 
+    public TeachersListResponse getTeachers(String search) {
+        log.info("TeacherScheduleService: start getTeachers(): {}", search);
+
+        try {
+            String firstRequest = firstConnectionToSchedule();
+            RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule("teacher", search, null, 0, firstRequest);
+            return finalConnectionToTeachers(secondRequest);
+        } catch (IOException ex) {
+            log.error(ex.getMessage());
+            throw new ScheduleNotFoundException("Teacher not found");
+        }
+    }
+
     public Schedule getScheduleByTeacher(String teacher, int week) {
         log.info("TeacherScheduleService: start getScheduleByTeacher(): {}, {}", teacher, week);
 
         try {
-            String request1 = firstConnectionToSchedule();
-            RequestTeacherAndAuditory requestTeacherAndAuditory2 = secondConnectionToSchedule(teacher, week, request1);
-            return finalConnectionToSchedule(requestTeacherAndAuditory2);
-        } catch (Exception ex) {
+            String firstRequest = firstConnectionToSchedule();
+            RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule("schedule", null, teacher, week, firstRequest);
+            return finalConnectionToSchedule(secondRequest);
+        } catch (IOException ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException("Во время поиска расписания произошла ошибка, повторите попытку позже.");
         }
@@ -132,8 +147,8 @@ public class TeacherScheduleService extends ScheduleService{
                 }""");
     }
 
-    private RequestTeacherAndAuditory secondConnectionToSchedule(String teacherName, int week, String firstRequest) throws IOException {
-        log.info("TeacherScheduleService: start secondConnectionToSchedule()");
+    private RequestTeacherAndAuditory secondConnectionToSchedule(String typeRequest, String search, String teacherName, int week, String firstRequest) throws IOException {
+        log.info("TeacherScheduleService: start secondConnectionToSchedule(): {}, {}, {}, {}", typeRequest, search, teacherName, week);
 
         Connection.Response response = getConnection(firstRequest);
         String decodedString = StringEscapeUtils.unescapeJava(response.body());
@@ -160,7 +175,37 @@ public class TeacherScheduleService extends ScheduleService{
             }
         }
 
-        return buildSecondRequest(teacherName, week, teachersList);
+        return buildSecondRequest(typeRequest, search, teacherName, week, teachersList);
+    }
+
+    private TeachersListResponse finalConnectionToTeachers(RequestTeacherAndAuditory secondRequest) throws IOException {
+        log.info("TeacherScheduleService: start finalConnectionToTeachers()");
+
+        Connection.Response response = getConnection(gson.toJson(secondRequest));
+        String responseBody = response.body();
+
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
+
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
+        String res = r1.concat(r2);
+
+        JSONObject jsonObject = new JSONObject(res);
+        JSONObject teacherJson = jsonObject.getJSONObject("serverMemo").getJSONObject("data").getJSONObject("teachersList");
+        List<Object> teachers = new ArrayList<>();
+        for (String teacherKey : teacherJson.keySet()) {
+            try {
+                Teacher teacher = gson.fromJson(teacherJson.getJSONObject(teacherKey).toString(), Teacher.class);
+                teachers.add(teacher);
+            } catch (Exception ex) {
+                teachers.add(teacherKey);
+            }
+        }
+
+        return new TeachersListResponse(teachers.size(), teachers);
     }
 
     private Schedule finalConnectionToSchedule(RequestTeacherAndAuditory firstRequest) throws IOException {
@@ -168,15 +213,14 @@ public class TeacherScheduleService extends ScheduleService{
 
         Connection.Response response = getConnection(gson.toJson(firstRequest));
         String responseBody = response.body();
-        String htmlSchedule = StringEscapeUtils.unescapeJava(responseBody);
 
-        String startMarker = "\"<div wire:id=\"";
-        String endMarker2 = "</div>";
-        int startIndex = htmlSchedule.indexOf(startMarker);
-        int endIndex2 = htmlSchedule.lastIndexOf(endMarker2);
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
 
-        String r1 = htmlSchedule.substring(0, startIndex+1);
-        String r2 = htmlSchedule.substring(endIndex2+7);
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
         String res = r1.concat(r2);
 
         return parseSchedule(res);
@@ -195,39 +239,16 @@ public class TeacherScheduleService extends ScheduleService{
                 .execute();
     }
 
-    private RequestTeacherAndAuditory buildSecondRequest(String teacherName, int week, Map<String, Object> teachersList) {
+    private RequestTeacherAndAuditory buildSecondRequest(String typeRequest, String search, String teacherName, int week, Map<String, Object> teachersList) {
         Fingerprint fingerprint = new Fingerprint(wireId, "teachers.teacher-main-grid", "ru", "teacher", "GET", "acj");
         Effects effects = new Effects();
         ServerMemo serverMemo = createServerMemo(teachersList);
 
-        List<Update> updates = new ArrayList<>();
-        Payload payload = Payload.builder()
-                .id("s7q8i")
-                .method("set")
-                .params(List.of(getTeacherId(teacherName)))
-                .build();
-        updates.add(new Update("callMethod", payload));
-
-        if (week > 0 ) {
-            for (int i = 0; i < week; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("addWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
-        } else if (week < 0) {
-            for (int i = week; i < 0; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("minusWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
+        List<Update> updates;
+        if (typeRequest.equals("schedule")) {
+            updates = createUpdates(teacherName, week);
+        } else {
+            updates = createUpdates(search);
         }
 
         return new RequestTeacherAndAuditory(fingerprint, effects, serverMemo, updates);
@@ -286,6 +307,50 @@ public class TeacherScheduleService extends ScheduleService{
                 .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
                 .build();
+    }
+
+    private List<Update> createUpdates(String teacherName, int week) {
+        List<Update> updates = new ArrayList<>();
+        Payload payload = Payload.builder()
+                .id("s7q8i")
+                .method("set")
+                .params(List.of(getTeacherId(teacherName)))
+                .build();
+        updates.add(new Update("callMethod", payload));
+
+        if (week > 0 ) {
+            for (int i = 0; i < week; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("addWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        } else if (week < 0) {
+            for (int i = week; i < 0; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("minusWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        }
+        return updates;
+    }
+
+    private List<Update> createUpdates(String search) {
+        List<Update> updates = new ArrayList<>();
+        PayloadForTeacher payload = PayloadForTeacher.builder()
+                .id("gqky")
+                .name("search")
+                .value(search)
+                .build();
+        updates.add(new Update("syncInput", payload));
+        return updates;
     }
 
     private String getTeacherId(String fio) {

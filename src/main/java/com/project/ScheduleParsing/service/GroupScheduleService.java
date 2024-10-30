@@ -12,7 +12,7 @@ import com.project.ScheduleParsing.request.updates.Payload;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringEscapeUtils;
+import org.apache.commons.text.StringEscapeUtils;
 import org.json.JSONObject;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
@@ -48,6 +48,7 @@ public class GroupScheduleService extends ScheduleService{
 
     public Schedule getScheduleByGroup(String group, Integer week) {
         log.info("GroupScheduleService: start getScheduleByGroup(): group - {}, week - {}", group, week);
+
         try {
             RequestGroup requestGroup1 = firstConnectionToSchedule();
             RequestGroup requestGroup2 = secondConnectionToSchedule(requestGroup1);

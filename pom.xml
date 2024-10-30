@@ -50,6 +50,11 @@
 			<version>3.12.0</version> <!-- Убедитесь, что используете последнюю версию -->
 		</dependency>
 		<dependency>
+			<groupId>org.apache.commons</groupId>
+			<artifactId>commons-text</artifactId>
+			<version>1.10.0</version> <!-- Убедитесь, что используете последнюю версию -->
+		</dependency>
+		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
 			<scope>runtime</scope>
