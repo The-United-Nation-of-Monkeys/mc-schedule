@@ -3,12 +3,14 @@ package com.project.ScheduleParsing.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
+import com.project.ScheduleParsing.dto.GroupListResponse;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Fingerprint;
 import com.project.ScheduleParsing.request.RequestGroup;
 import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
+import com.project.ScheduleParsing.request.updates.PayloadForTeacher;
 import com.project.ScheduleParsing.request.updates.Update;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -46,14 +49,29 @@ public class GroupScheduleService extends ScheduleService{
 
     private final Gson gson = new GsonBuilder().serializeNulls().setExclusionStrategies(new AnnotationExclusionStrategy()).create();
 
+    public GroupListResponse getGroups(String search) {
+        log.info("GroupScheduleService: start getGroups(): search - {}", search);
+
+        try {
+            RequestGroup firstRequest = firstConnectionToSchedule();
+            RequestGroup secondRequest = secondConnectionToSchedule(firstRequest);
+            RequestGroup thirdRequest = thirdConnectionToSchedule("group", search, secondRequest, null, 0);
+            return lastConnectionToGroups(thirdRequest);
+        } catch (IOException ex) {
+            log.info(ex.getMessage());
+            throw new ScheduleNotFoundException(ex.getMessage());
+        }
+
+    }
+
     public Schedule getScheduleByGroup(String group, Integer week) {
         log.info("GroupScheduleService: start getScheduleByGroup(): group - {}, week - {}", group, week);
 
         try {
-            RequestGroup requestGroup1 = firstConnectionToSchedule();
-            RequestGroup requestGroup2 = secondConnectionToSchedule(requestGroup1);
-            RequestGroup requestGroup3 = thirdConnectionToSchedule(requestGroup2, group, week);
-            return lastConnectionToSchedule(requestGroup3);
+            RequestGroup firstRequest = firstConnectionToSchedule();
+            RequestGroup secondRequest = secondConnectionToSchedule(firstRequest);
+            RequestGroup thirdRequest = thirdConnectionToSchedule("schedule", null, secondRequest, group, week);
+            return lastConnectionToSchedule(thirdRequest);
         } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException(ex.getMessage());
@@ -105,13 +123,13 @@ public class GroupScheduleService extends ScheduleService{
         return buildSecondRequest();
     }
 
-    private RequestGroup thirdConnectionToSchedule(RequestGroup secondRequestGroup, String group, Integer week) throws IOException {
+    private RequestGroup thirdConnectionToSchedule(String typeRequest, String search, RequestGroup secondRequestGroup, String group, Integer week) throws IOException {
         log.info("GroupScheduleService: start thirdConnectionToSchedule(): {}, {}", group, week);
 
         Connection.Response response = getConnection(secondRequestGroup);
         String responseBody = response.body();
         checkSum = extractValueFromJson(responseBody, "checksum");
-        return buildThirdRequest(group, week);
+        return buildThirdRequest(typeRequest, search, group, week);
     }
 
     private Schedule lastConnectionToSchedule(RequestGroup thirdRequestGroup) throws IOException {
@@ -130,6 +148,25 @@ public class GroupScheduleService extends ScheduleService{
         String res = r1.concat(r2);
 
         return parseSchedule(res);
+    }
+
+    private GroupListResponse lastConnectionToGroups(RequestGroup thirdRequestGroup) throws IOException {
+        log.info("GroupScheduleService: start lastConnectionToGroups()");
+
+        Connection.Response lastResponse = getConnection(thirdRequestGroup);
+        String responseBody = lastResponse.body();
+
+        JSONObject jsonObject = new JSONObject(responseBody);
+        String data = jsonObject.getJSONObject("effects").getString("html");
+
+        Document doc = Jsoup.parse(data, "UTF-8");
+        Elements groupElements = doc.select("li");
+        List<String> groups = new ArrayList<>();
+        for (Element li : groupElements) {
+            groups.add(li.text());
+        }
+
+        return new GroupListResponse(groups.size(), groups);
     }
 
     private Connection.Response getConnection(RequestGroup requestGroup) throws IOException {
@@ -187,39 +224,15 @@ public class GroupScheduleService extends ScheduleService{
         return new RequestGroup(fingerprint, serverMemo, List.of(update));
     }
 
-    private RequestGroup buildThirdRequest(String group, Integer week) {
+    private RequestGroup buildThirdRequest(String typeRequest, String search, String group, Integer week) {
         Fingerprint fingerprint = new Fingerprint(wireId, "main-grid", "ru", "/", "GET", "acj");
         ServerMemo serverMemo = createServerMemo(null, true, 630, 705);
 
-        Payload payload = Payload.builder()
-                .id("w887")
-                .method("set")
-                .params(List.of(group))
-                .build();
-
-        List<Update> updates = new ArrayList<>();
-        updates.add(new Update("callMethod", payload));
-
-        if (week > 0 ) {
-            for (int i = 0; i < week; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("addWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
-        } else if (week < 0) {
-            for (int i = week; i < 0; i++){
-                Payload newPayload = Payload.builder()
-                        .id("w887")
-                        .method("minusWeek")
-                        .params(new ArrayList<>())
-                        .build();
-
-                updates.add(new Update("callMethod", newPayload));
-            }
+        List<Update> updates;
+        if (typeRequest.equals("schedule")) {
+            updates = createUpdates(group, week);
+        } else {
+            updates = createUpdates(search);
         }
 
         return new RequestGroup(fingerprint, serverMemo, updates);
@@ -286,5 +299,49 @@ public class GroupScheduleService extends ScheduleService{
                 .dataMeta(dataMetaForGroup)
                 .checksum(checkSum)
                 .build();
+    }
+
+    private List<Update> createUpdates(String group, int week) {
+        List<Update> updates = new ArrayList<>();
+        Payload payload = Payload.builder()
+                .id("s7q8i")
+                .method("set")
+                .params(List.of(group))
+                .build();
+        updates.add(new Update("callMethod", payload));
+
+        if (week > 0 ) {
+            for (int i = 0; i < week; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("addWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        } else if (week < 0) {
+            for (int i = week; i < 0; i++){
+                Payload newPayload = Payload.builder()
+                        .id("w887")
+                        .method("minusWeek")
+                        .params(new ArrayList<>())
+                        .build();
+
+                updates.add(new Update("callMethod", newPayload));
+            }
+        }
+        return updates;
+    }
+
+    private List<Update> createUpdates(String search) {
+        List<Update> updates = new ArrayList<>();
+        PayloadForTeacher payload = PayloadForTeacher.builder()
+                .id("gqky")
+                .name("search")
+                .value(search)
+                .build();
+        updates.add(new Update("syncInput", payload));
+        return updates;
     }
 }

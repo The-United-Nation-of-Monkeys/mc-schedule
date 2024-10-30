@@ -1,6 +1,7 @@
 package com.project.ScheduleParsing.controller;
 
 import com.project.ScheduleParsing.dto.ClassroomListResponse;
+import com.project.ScheduleParsing.dto.GroupListResponse;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.dto.TeachersListResponse;
 import com.project.ScheduleParsing.service.ClassroomScheduleService;
@@ -35,6 +36,11 @@ public class ScheduleController {
     @GetMapping("/classroom")
     public ResponseEntity<Schedule> getScheduleByAuditory(@RequestParam String auditory, @RequestParam int week) {
         return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroom(auditory, week));
+    }
+
+    @GetMapping("/groups")
+    public ResponseEntity<GroupListResponse> getGroups(@RequestParam String search) {
+        return ResponseEntity.ok(groupScheduleService.getGroups(search));
     }
 
     @GetMapping("/teachers")

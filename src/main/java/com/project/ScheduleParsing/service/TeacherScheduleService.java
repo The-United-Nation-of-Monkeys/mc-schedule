@@ -7,7 +7,6 @@ import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.dto.Teacher;
 import com.project.ScheduleParsing.dto.TeachersListResponse;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
-import com.project.ScheduleParsing.repository.TeacherRepository;
 import com.project.ScheduleParsing.request.*;
 import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
@@ -48,8 +47,6 @@ public class TeacherScheduleService extends ScheduleService{
     private Integer numWeek;
 
     private final Gson gson = new GsonBuilder().serializeNulls().setExclusionStrategies(new AnnotationExclusionStrategy()).create();
-
-    private final TeacherRepository teacherRepository;
 
     public TeachersListResponse getTeachers(String search) {
         log.info("TeacherScheduleService: start getTeachers(): {}", search);
@@ -178,6 +175,24 @@ public class TeacherScheduleService extends ScheduleService{
         return buildSecondRequest(typeRequest, search, teacherName, week, teachersList);
     }
 
+    private Schedule finalConnectionToSchedule(RequestTeacherAndAuditory firstRequest) throws IOException {
+        log.info("TeacherScheduleService: start finalConnectionToSchedule()");
+
+        Connection.Response response = getConnection(gson.toJson(firstRequest));
+        String responseBody = response.body();
+
+        String startMarker = "\"<div wire:id=";
+        String endMarker2 = "dirty";
+        int startIndex = responseBody.indexOf(startMarker);
+        int endIndex2 = responseBody.lastIndexOf(endMarker2);
+
+        String r1 = responseBody.substring(0, startIndex+1);
+        String r2 = responseBody.substring(endIndex2-3);
+        String res = r1.concat(r2);
+
+        return parseSchedule(res);
+    }
+
     private TeachersListResponse finalConnectionToTeachers(RequestTeacherAndAuditory secondRequest) throws IOException {
         log.info("TeacherScheduleService: start finalConnectionToTeachers()");
 
@@ -206,24 +221,6 @@ public class TeacherScheduleService extends ScheduleService{
         }
 
         return new TeachersListResponse(teachers.size(), teachers);
-    }
-
-    private Schedule finalConnectionToSchedule(RequestTeacherAndAuditory firstRequest) throws IOException {
-        log.info("TeacherScheduleService: start finalConnectionToSchedule()");
-
-        Connection.Response response = getConnection(gson.toJson(firstRequest));
-        String responseBody = response.body();
-
-        String startMarker = "\"<div wire:id=";
-        String endMarker2 = "dirty";
-        int startIndex = responseBody.indexOf(startMarker);
-        int endIndex2 = responseBody.lastIndexOf(endMarker2);
-
-        String r1 = responseBody.substring(0, startIndex+1);
-        String r2 = responseBody.substring(endIndex2-3);
-        String res = r1.concat(r2);
-
-        return parseSchedule(res);
     }
 
     private Connection.Response getConnection(String request) throws IOException {
@@ -314,7 +311,7 @@ public class TeacherScheduleService extends ScheduleService{
         Payload payload = Payload.builder()
                 .id("s7q8i")
                 .method("set")
-                .params(List.of(getTeacherId(teacherName)))
+                .params(List.of(teacherName))
                 .build();
         updates.add(new Update("callMethod", payload));
 
@@ -351,10 +348,5 @@ public class TeacherScheduleService extends ScheduleService{
                 .build();
         updates.add(new Update("syncInput", payload));
         return updates;
-    }
-
-    private String getTeacherId(String fio) {
-        com.project.ScheduleParsing.model.Teacher teacher = teacherRepository.findTeacherByFio(fio);
-        return String.valueOf(teacher.getId());
     }
 }

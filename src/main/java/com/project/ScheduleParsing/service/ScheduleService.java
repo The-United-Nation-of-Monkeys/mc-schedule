@@ -25,8 +25,14 @@ public abstract class ScheduleService {
     Schedule parseSchedule(String json) {
         JSONObject jsonObject = new JSONObject(json);
         JSONObject data = jsonObject.getJSONObject("serverMemo").getJSONObject("data");
-        JSONObject events = data.getJSONObject("events");
+        if (!data.has("events")) {
+            return Schedule.builder()
+                    .allPairCount(0)
+                    .days(new ArrayList<>())
+                    .build();
+        }
 
+        JSONObject events = data.getJSONObject("events");
         List<Day> days = new ArrayList<>(Collections.nCopies(7, null));
         int allPairCount = data.getInt("count");
         for (String key : events.keySet()) {
