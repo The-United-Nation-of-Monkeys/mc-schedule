@@ -1,5 +1,6 @@
 package com.project.ScheduleParsing.dto;
 
+import com.project.ScheduleParsing.annotation.ExcludeFromGson;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Data;
 
@@ -35,5 +36,6 @@ public class Teacher {
     private String department;
 
     @Schema(description = "Ссылка на фото")
+    @ExcludeFromGson
     private String photoUrl;
 }
