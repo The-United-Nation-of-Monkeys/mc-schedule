@@ -33,4 +33,7 @@ public class Teacher {
 
     @Schema(description = "Департамент", example = "Колледж Автономной некоммерческой образовательной организации высшего образования «Научно-технологический университет «Сириус»")
     private String department;
+
+    @Schema(description = "Ссылка на фото")
+    private String photoUrl;
 }

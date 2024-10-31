@@ -44,8 +44,6 @@ public abstract class ScheduleService {
                 JSONArray eventArray = events.getJSONArray(key);
                 Day day = getDayFromJSONArray(eventArray, key);
                 days.set(getDayIndex(key.split(",")[0]), day);
-            } else {
-                days.set(getDayIndex(key.split(",")[0]), null);
             }
         }
 
@@ -60,18 +58,51 @@ public abstract class ScheduleService {
         day.setFullDayName(key);
         List<List<Pair>> pairs = new ArrayList<>();
 
-        boolean first = true;
-        for (String pairKey : jsonObject.keySet()) {
-            JSONObject pairData = (JSONObject) jsonObject.getJSONArray(pairKey).get(0);
+        for (String keyPair : jsonObject.keySet()) {
+            JSONArray pairDataArr = jsonObject.getJSONArray(keyPair);
+            getPairs(pairs, pairDataArr);
+        }
 
-            LocalDate date = LocalDate.parse(pairData.getString("date"), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
-            if (first) {
-                day.setDay(date.getDayOfMonth());
-                day.setMonth(date.getMonthValue());
-                day.setYear(date.getYear());
-                day.setDayWeek(pairData.getString("dayWeek"));
-                first = false;
-            }
+        if (!pairs.isEmpty()) {
+            Pair firstPair = pairs.get(0).get(0);
+            LocalDate date = LocalDate.parse(firstPair.getDate(), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+            day.setDay(date.getDayOfMonth());
+            day.setMonth(date.getMonthValue());
+            day.setYear(date.getYear());
+            day.setDayWeek(firstPair.getDayWeek());
+        }
+        day.setPairCount(pairs.size());
+        day.setPairList(pairs);
+        return day;
+    }
+
+    Day getDayFromJSONArray(JSONArray jsonArray, String key) {
+        Day day = new Day();
+        day.setFullDayName(key);
+        List<List<Pair>> pairs = new ArrayList<>();
+
+        for (int i = 0; i < jsonArray.length(); i++) {
+            JSONArray pairDataArr = jsonArray.getJSONArray(i);
+            getPairs(pairs, pairDataArr);
+        }
+
+        if (!pairs.isEmpty()) {
+            Pair firstPair = pairs.get(0).get(0);
+            LocalDate date = LocalDate.parse(firstPair.getDate(), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+            day.setDay(date.getDayOfMonth());
+            day.setMonth(date.getMonthValue());
+            day.setYear(date.getYear());
+            day.setDayWeek(firstPair.getDayWeek());
+        }
+        day.setPairCount(pairs.size());
+        day.setPairList(pairs);
+        return day;
+    }
+
+    private void getPairs(List<List<Pair>> pairs, JSONArray pairDataArr) {
+        List<Pair> pairModule = new ArrayList<>();
+        for (int j = 0; j < pairDataArr.length(); j++) {
+            JSONObject pairData = pairDataArr.getJSONObject(j);
 
             JSONObject teacherJson = pairData.getJSONObject("teachers");
             List<Object> teachers = new ArrayList<>();
@@ -86,56 +117,9 @@ public abstract class ScheduleService {
 
             Pair pair = gson.fromJson(pairData.toString(), Pair.class);
             pair.setTeachers(teachers);
-            pairs.add(List.of(pair));
+            pairModule.add(pair);
         }
-
-        day.setPairCount(pairs.size());
-        day.setPairList(pairs);
-        return day;
-    }
-
-    Day getDayFromJSONArray(JSONArray jsonArray, String key) {
-        Day day = new Day();
-        day.setFullDayName(key);
-        List<List<Pair>> pairs = new ArrayList<>();
-
-        boolean first = true;
-        for (int i = 0; i < jsonArray.length(); i++) {
-            JSONArray pairDataArr = jsonArray.getJSONArray(i);
-            List<Pair> pairModule = new ArrayList<>();
-            for (int j = 0; j < pairDataArr.length(); j++) {
-                JSONObject pairData = pairDataArr.getJSONObject(j);
-
-                LocalDate date = LocalDate.parse(pairData.getString("date"), DateTimeFormatter.ofPattern("dd.MM.yyyy"));
-                if (first) {
-                    day.setDay(date.getDayOfMonth());
-                    day.setMonth(date.getMonthValue());
-                    day.setYear(date.getYear());
-                    day.setDayWeek(pairData.getString("dayWeek"));
-                    first = false;
-                }
-
-                JSONObject teacherJson = pairData.getJSONObject("teachers");
-                List<Object> teachers = new ArrayList<>();
-                for (String teacherKey : teacherJson.keySet()) {
-                    try {
-                        Teacher teacher = gson.fromJson(teacherJson.getJSONObject(teacherKey).toString(), Teacher.class);
-                        teachers.add(teacher);
-                    } catch (Exception ex) {
-                        teachers.add(teacherKey);
-                    }
-                }
-
-                Pair pair = gson.fromJson(pairData.toString(), Pair.class);
-                pair.setTeachers(teachers);
-                pairModule.add(pair);
-            }
-            pairs.add(pairModule);
-        }
-
-        day.setPairCount(pairs.size());
-        day.setPairList(pairs);
-        return day;
+        pairs.add(pairModule);
     }
 
      int getDayIndex(String day) {
