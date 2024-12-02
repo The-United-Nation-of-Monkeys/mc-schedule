@@ -34,8 +34,8 @@ public class ScheduleController {
     }
 
     @GetMapping("/classroom")
-    public ResponseEntity<Schedule> getScheduleByAuditory(@RequestParam String auditory, @RequestParam int week) {
-        return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroom(auditory, week));
+    public ResponseEntity<Schedule> getScheduleByAuditory(@RequestParam String classroom, @RequestParam int week) {
+        return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroom(classroom, week));
     }
 
     @GetMapping("/groups")
