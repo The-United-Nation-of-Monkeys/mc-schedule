@@ -12,6 +12,7 @@ public class OpenApiConfig {
     @Bean
     public OpenAPI customOpenAPI() {
         return new OpenAPI()
+                .addServersItem(new Server().url("http://localhost:8088/"))
                 .addServersItem(new Server().url("https://schedule.tunom.ru/"))
                 .info(new Info()
                         .title("API Documentation")
