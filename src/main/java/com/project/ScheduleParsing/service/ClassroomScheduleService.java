@@ -235,7 +235,9 @@ public class ClassroomScheduleService extends ScheduleService{
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
 
         Month month = Month.builder()
-                .number(String.valueOf(now.getMonthValue()))
+                .number(String.valueOf(now.getMonthValue()).length() == 1 ?
+                        "0" + now.getMonthValue() :
+                        String.valueOf(now.getMonthValue()))
                 .full(Months.values()[now.getMonthValue()-1].toString())
                 .fullForDisplay(MonthForFront.values()[now.getMonthValue()-1].toString())
                 .build();
