@@ -28,6 +28,11 @@ public class ScheduleController {
         return ResponseEntity.ok(groupScheduleService.getScheduleByGroup(group, week));
     }
 
+    @GetMapping("/group/now")
+    public ResponseEntity<List<Pair>> getScheduleByGroupNow(@RequestParam String group) {
+        return ResponseEntity.ok(groupScheduleService.getScheduleByGroupNow(group));
+    }
+
     @GetMapping("/teacher")
     public ResponseEntity<Schedule> getScheduleByTeacher(@RequestParam String teacher, @RequestParam int week) {
         TeachersListResponse teacherResponse = teacherScheduleService.getTeachers(teacher);
@@ -63,4 +68,6 @@ public class ScheduleController {
     public ResponseEntity<ClassroomListResponse> getClassrooms(@RequestParam String search) {
         return ResponseEntity.ok(classroomScheduleService.getClassrooms(search));
     }
+
+
 }

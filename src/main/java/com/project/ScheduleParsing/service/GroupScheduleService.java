@@ -1,9 +1,12 @@
 package com.project.ScheduleParsing.service;
 
+import com.fasterxml.jackson.databind.JsonSerializer;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
+import com.project.ScheduleParsing.dto.Day;
 import com.project.ScheduleParsing.dto.GroupListResponse;
+import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Fingerprint;
@@ -12,6 +15,7 @@ import com.project.ScheduleParsing.request.servermemo.*;
 import com.project.ScheduleParsing.request.updates.Payload;
 import com.project.ScheduleParsing.request.updates.PayloadForTeacher;
 import com.project.ScheduleParsing.request.updates.Update;
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.text.StringEscapeUtils;
@@ -24,7 +28,10 @@ import org.jsoup.select.Elements;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.sql.Time;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -76,6 +83,41 @@ public class GroupScheduleService extends ScheduleService{
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException(ex.getMessage());
         }
+    }
+
+    public List<Pair> getScheduleByGroupNow(String group) {
+        log.info("Artem sosi huy");
+
+        Schedule scheduleWeek = getScheduleByGroup(group, 0);
+
+        LocalDate dateNow = LocalDate.now();
+        LocalTime timeNow = LocalTime.now();
+
+        for (Day day : scheduleWeek.getDays()) {
+            if (day.getDay() != null && day.getDay() == dateNow.getDayOfMonth()) {
+                log.info("day week - {}", day.getDay());
+                LocalTime timeStartPair;
+                LocalTime timeEndPair;
+
+                for (List<Pair> pair : day.getPairList()) {
+                    timeStartPair = LocalTime.parse(pair.get(0).getStartTime());
+                    timeEndPair = LocalTime.parse(pair.get(0).getEndTime());
+
+                    if (timeStartPair.isBefore(timeNow) && timeEndPair.isAfter(timeNow)) {
+                        log.info("pair list now - {}", pair);
+                        if (pair.isEmpty()) {
+                            return new ArrayList<>();
+                        } else {
+                            return pair;
+                        }
+                    }
+                }
+            } else {
+                return new ArrayList<>();
+            }
+        }
+        log.error("сори разраб Илья даун");
+        throw new ScheduleNotFoundException("сори разраб Илья даун");
     }
 
     private RequestGroup firstConnectionToSchedule() throws IOException {
