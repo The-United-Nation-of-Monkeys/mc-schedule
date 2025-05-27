@@ -83,6 +83,7 @@ public class ClassroomScheduleService extends ScheduleService{
         log.info("ClassroomScheduleService: start getScheduleByAuditoryNow(): {}", auditory);
 
         Schedule scheduleWeek = getScheduleByClassroom(auditory, 0);
+
         return getPairNow(scheduleWeek);
     }
 
