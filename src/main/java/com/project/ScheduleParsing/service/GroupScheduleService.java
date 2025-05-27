@@ -112,12 +112,9 @@ public class GroupScheduleService extends ScheduleService{
                         }
                     }
                 }
-            } else {
-                return new ArrayList<>();
             }
         }
-        log.error("сори разраб Илья даун");
-        throw new ScheduleNotFoundException("сори разраб Илья даун");
+        return new ArrayList<>();
     }
 
     private RequestGroup firstConnectionToSchedule() throws IOException {
