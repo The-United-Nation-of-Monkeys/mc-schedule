@@ -40,9 +40,21 @@ public class ScheduleController {
         return ResponseEntity.ok(teacherScheduleService.getScheduleByTeacher(teacherDto.getId(), week));
     }
 
+    @GetMapping("/teacher/now")
+    public ResponseEntity<List<Pair>> getScheduleByTeacherNow(@RequestParam String teacher) {
+        TeachersListResponse teacherResponse = teacherScheduleService.getTeachers(teacher);
+        Teacher teacherDto = (Teacher) teacherResponse.getTeachers().get(0);
+        return ResponseEntity.ok(teacherScheduleService.getScheduleByTeacherNow(teacherDto.getId()));
+    }
+
     @GetMapping("/classroom")
     public ResponseEntity<Schedule> getScheduleByAuditory(@RequestParam String classroom, @RequestParam int week) {
         return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroom(classroom, week));
+    }
+
+    @GetMapping("/classroom/now")
+    public ResponseEntity<List<Pair>> getScheduleByAuditory(@RequestParam String classroom) {
+        return ResponseEntity.ok(classroomScheduleService.getScheduleByClassroomNow(classroom));
     }
 
     @GetMapping("/groups")

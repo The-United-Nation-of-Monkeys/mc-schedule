@@ -3,9 +3,7 @@ package com.project.ScheduleParsing.service;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
-import com.project.ScheduleParsing.dto.Schedule;
-import com.project.ScheduleParsing.dto.Teacher;
-import com.project.ScheduleParsing.dto.TeachersListResponse;
+import com.project.ScheduleParsing.dto.*;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.*;
 import com.project.ScheduleParsing.request.servermemo.*;
@@ -23,7 +21,9 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -55,7 +55,7 @@ public class TeacherScheduleService extends ScheduleService{
             String firstRequest = firstConnectionToSchedule();
             RequestTeacherAndAuditory secondRequest = secondConnectionToSchedule("teacher", search, null, 0, firstRequest);
             return finalConnectionToTeachers(secondRequest);
-        } catch (IOException ex) {
+        } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException("Teacher not found");
         }
@@ -72,6 +72,15 @@ public class TeacherScheduleService extends ScheduleService{
             log.error(ex.getMessage());
             throw new ScheduleNotFoundException("Во время поиска расписания произошла ошибка, повторите попытку позже.");
         }
+    }
+
+    public List<Pair> getScheduleByTeacherNow(String teacher) {
+        log.info("TeacherScheduleService: start getScheduleByTeacherNow(): {}", teacher);
+        log.info("artem sosi huy");
+
+        Schedule scheduleWeek = getScheduleByTeacher(teacher, 0);
+
+        return getPairNow(scheduleWeek);
     }
 
     private String firstConnectionToSchedule() throws IOException {

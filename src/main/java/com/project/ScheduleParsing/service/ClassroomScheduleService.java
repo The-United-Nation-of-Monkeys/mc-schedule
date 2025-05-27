@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.project.ScheduleParsing.annotation.AnnotationExclusionStrategy;
 import com.project.ScheduleParsing.dto.ClassroomListResponse;
+import com.project.ScheduleParsing.dto.Day;
+import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.exception.ScheduleNotFoundException;
 import com.project.ScheduleParsing.request.Effects;
@@ -25,7 +27,9 @@ import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 
@@ -73,6 +77,13 @@ public class ClassroomScheduleService extends ScheduleService{
         } catch (IOException e) {
             throw new ScheduleNotFoundException(e.getMessage());
         }
+    }
+
+    public List<Pair> getScheduleByClassroomNow(String auditory) {
+        log.info("ClassroomScheduleService: start getScheduleByAuditoryNow(): {}", auditory);
+
+        Schedule scheduleWeek = getScheduleByClassroom(auditory, 0);
+        return getPairNow(scheduleWeek);
     }
 
     private String firstConnectionToSchedule() throws IOException {

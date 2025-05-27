@@ -7,10 +7,12 @@ import com.project.ScheduleParsing.dto.Day;
 import com.project.ScheduleParsing.dto.Pair;
 import com.project.ScheduleParsing.dto.Schedule;
 import com.project.ScheduleParsing.dto.Teacher;
+import lombok.extern.slf4j.Slf4j;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+@Slf4j
 public abstract class ScheduleService {
 
     private final Gson gson = new GsonBuilder().serializeNulls().setExclusionStrategies(new AnnotationExclusionStrategy()).create();
@@ -121,6 +124,37 @@ public abstract class ScheduleService {
         }
         pairs.add(pairModule);
     }
+
+    protected List<Pair> getPairNow(Schedule scheduleWeek) {
+        LocalTime timeNow = LocalTime.now();
+        LocalDate dateNow = LocalDate.now();
+
+        for (Day day : scheduleWeek.getDays()) {
+            if (day.getDay() != null && day.getDay() == dateNow.getDayOfMonth()) {
+                log.info("day week - {}", day.getDay());
+                LocalTime timeStartPair;
+                LocalTime timeEndPair;
+
+                for (List<Pair> pair : day.getPairList()) {
+                    timeStartPair = LocalTime.parse(pair.get(0).getStartTime());
+                    timeEndPair = LocalTime.parse(pair.get(0).getEndTime());
+
+                    if (timeStartPair.isBefore(timeNow) && timeEndPair.isAfter(timeNow)) {
+                        log.info("pair list now - {}", pair);
+                        if (pair.isEmpty()) {
+                            return new ArrayList<>();
+                        } else {
+                            return pair;
+                        }
+                    }
+                }
+            }
+        }
+
+
+        return new ArrayList<>();
+    }
+
 
      int getDayIndex(String day) {
         return switch (day) {

@@ -90,31 +90,7 @@ public class GroupScheduleService extends ScheduleService{
 
         Schedule scheduleWeek = getScheduleByGroup(group, 0);
 
-        LocalDate dateNow = LocalDate.now();
-        LocalTime timeNow = LocalTime.now();
-
-        for (Day day : scheduleWeek.getDays()) {
-            if (day.getDay() != null && day.getDay() == dateNow.getDayOfMonth()) {
-                log.info("day week - {}", day.getDay());
-                LocalTime timeStartPair;
-                LocalTime timeEndPair;
-
-                for (List<Pair> pair : day.getPairList()) {
-                    timeStartPair = LocalTime.parse(pair.get(0).getStartTime());
-                    timeEndPair = LocalTime.parse(pair.get(0).getEndTime());
-
-                    if (timeStartPair.isBefore(timeNow) && timeEndPair.isAfter(timeNow)) {
-                        log.info("pair list now - {}", pair);
-                        if (pair.isEmpty()) {
-                            return new ArrayList<>();
-                        } else {
-                            return pair;
-                        }
-                    }
-                }
-            }
-        }
-        return new ArrayList<>();
+        return getPairNow(scheduleWeek);
     }
 
     private RequestGroup firstConnectionToSchedule() throws IOException {
